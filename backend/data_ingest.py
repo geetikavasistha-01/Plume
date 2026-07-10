@@ -207,18 +207,14 @@ def main():
     region_name = args.region
     is_custom = region_name.lower() == "custom"
     
-    if is_custom:
-        if args.lat_min is None or args.lat_max is None or args.lon_min is None or args.lon_max is None:
-            print("Error: custom region requires bounding box inputs.")
-            sys.exit(1)
+    # Bounding box resolution
+    if args.lat_min is not None and args.lat_max is not None and args.lon_min is not None and args.lon_max is not None:
         bbox = {
             'min_lat': args.lat_min,
             'max_lat': args.lat_max,
             'min_lon': args.lon_min,
             'max_lon': args.lon_max
         }
-        # Dynamic name for custom regions
-        region_name = f"Custom_{bbox['min_lat']}_{bbox['max_lat']}_{bbox['min_lon']}_{bbox['max_lon']}"
     elif region_name in config.PRESET_REGIONS:
         region_coords = config.PRESET_REGIONS[region_name]
         bbox = {
@@ -227,8 +223,11 @@ def main():
             'min_lon': region_coords['lon_min'],
             'max_lon': region_coords['lon_max']
         }
+    elif is_custom:
+        print("Error: custom region requires bounding box inputs.")
+        sys.exit(1)
     else:
-        print(f"Error: Unknown region {region_name}")
+        print(f"Error: Unknown region '{region_name}' and no bounding box provided.")
         sys.exit(1)
         
     region_slug = config.get_region_slug(region_name)
