@@ -254,75 +254,9 @@ with left_desc:
     5. **Output Head:** A single linear dense unit generates the continuous AQI forecast value.
     """)
 
-# DOT graph for architecture
-arch_dot = """
-digraph G {
-    bgcolor="#1f2833"
-    rankdir=TB
-    node [style=filled, fillcolor="#0b0c10", color="#66fcf1", fontcolor="#ffffff", shape=box, style="rounded,filled", fontname="Outfit", fontsize=11, width=3.5]
-    edge [color="#66fcf1", fontname="Outfit", fontsize=9]
-    
-    "Input Sequence\\nShape: (7, 8)" -> "Conv1D Layer\\nShape: (7, 32)\\n32 filters, kernel=3, ReLU" [color="#66fcf1"];
-    "Conv1D Layer\\nShape: (7, 32)\\n32 filters, kernel=3, ReLU" -> "Batch Norm & Dropout (0.1)\\nRegularization" [color="#45a29e", style=dashed];
-    "Batch Norm & Dropout (0.1)\\nRegularization" -> "LSTM Layer\\nShape: (32,)\\n32 recurrent units" [color="#c77dff"];
-    "LSTM Layer\\nShape: (32,)\\n32 recurrent units" -> "Dense Hidden Layer\\nShape: (16,)\\n16 nodes, ReLU" [color="#ff7e00"];
-    "Dense Hidden Layer\\nShape: (16,)\\n16 nodes, ReLU" -> "Output Dense Layer\\nShape: (1,)\\nPredicted AQI (Linear)" [color="#66fcf1", penwidth=2];
-    
-    "LSTM Layer\\nShape: (32,)\\n32 recurrent units" [color="#c77dff", fontcolor="#c77dff"];
-    "Dense Hidden Layer\\nShape: (16,)\\n16 nodes, ReLU" [color="#ff7e00", fontcolor="#ff7e00"];
-}
-"""
-
-# Custom SVG fallback for architecture
-arch_svg = """
-<div style="display: flex; justify-content: center; width: 100%;">
-<svg viewBox="0 0 600 430" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="background:#1f2833; border: 1px solid rgba(199, 125, 255, 0.3); border-radius: 12px; padding: 15px;">
-  <defs>
-    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1f2833" />
-      <stop offset="100%" stop-color="#0f1115" />
-    </linearGradient>
-    <marker id="arrow-down" viewBox="0 0 10 10" refX="5" refY="8" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M 0 0 L 5 10 L 10 0 z" fill="#66fcf1" />
-    </marker>
-  </defs>
-  
-  <rect x="120" y="20" width="360" height="45" rx="6" fill="url(#purpleGrad)" stroke="#66fcf1" stroke-width="2" />
-  <text x="300" y="47" fill="#ffffff" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Input Sequence: Shape (7, 8)</text>
-  <text x="300" y="58" fill="#8b8c8d" font-size="9" font-family="'Outfit', sans-serif" text-anchor="middle">7-Day Lookback × 8 Features (HCHO, NO2, AOD, Met vars)</text>
-
-  <rect x="120" y="100" width="360" height="45" rx="6" fill="url(#purpleGrad)" stroke="#66fcf1" stroke-width="2" />
-  <text x="300" y="127" fill="#66fcf1" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Conv1D Layer: Output Shape (7, 32)</text>
-  <text x="300" y="138" fill="#e0e0e0" font-size="9" font-family="'Outfit', sans-serif" text-anchor="middle">32 Filters, Kernel Size = 3, Activation = ReLU</text>
-
-  <rect x="150" y="175" width="300" height="35" rx="6" fill="url(#purpleGrad)" stroke="#45a29e" stroke-width="1.5" stroke-dasharray="4,4" />
-  <text x="300" y="197" fill="#a0a0a0" font-size="11" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Batch Normalization & Dropout (0.1)</text>
-
-  <rect x="120" y="240" width="360" height="45" rx="6" fill="url(#purpleGrad)" stroke="#c77dff" stroke-width="2" />
-  <text x="300" y="267" fill="#c77dff" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">LSTM Layer: Output Shape (32,)</text>
-  <text x="300" y="278" fill="#e0e0e0" font-size="9" font-family="'Outfit', sans-serif" text-anchor="middle">32 Recurrent Units, return_sequences = False</text>
-
-  <rect x="120" y="315" width="360" height="45" rx="6" fill="url(#purpleGrad)" stroke="#ff7e00" stroke-width="2" />
-  <text x="300" y="342" fill="#ff7e00" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Dense Hidden Layer: Output Shape (16,)</text>
-  <text x="300" y="353" fill="#e0e0e0" font-size="9" font-family="'Outfit', sans-serif" text-anchor="middle">16 Dense Nodes, Activation = ReLU</text>
-
-  <rect x="150" y="385" width="300" height="35" rx="6" fill="url(#purpleGrad)" stroke="#66fcf1" stroke-width="2" />
-  <text x="300" y="407" fill="#66fcf1" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Output Layer: Shape (1,) -> Predicted AQI</text>
-
-  <line x1="300" y1="65" x2="300" y2="92" stroke="#66fcf1" stroke-width="1.5" marker-end="url(#arrow-down)" />
-  <line x1="300" y1="145" x2="300" y2="167" stroke="#45a29e" stroke-width="1.5" marker-end="url(#arrow-down)" />
-  <line x1="300" y1="210" x2="300" y2="232" stroke="#c77dff" stroke-width="1.5" marker-end="url(#arrow-down)" />
-  <line x1="300" y1="285" x2="300" y2="307" stroke="#ff7e00" stroke-width="1.5" marker-end="url(#arrow-down)" />
-  <line x1="300" y1="360" x2="300" y2="377" stroke="#66fcf1" stroke-width="1.5" marker-end="url(#arrow-down)" />
-</svg>
-</div>
-"""
-
 with right_arch:
-    try:
-        st.graphviz_chart(arch_dot, use_container_width=True)
-    except Exception:
-        st.markdown(arch_svg, unsafe_allow_html=True)
+    arch_image_path = os.path.join(assets_dir, "model_architecture.png")
+    st.image(arch_image_path, caption="CNN-1D + LSTM Model Architecture Details", use_container_width=True)
 
 st.divider()
 
