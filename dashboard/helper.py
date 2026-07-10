@@ -45,21 +45,40 @@ def run_pipeline(region_name, bbox=None):
         ]
         
     try:
-        # Step 1: Ingest
-        with st.spinner(f"Step 1/3: Ingesting Sentinel-5P + ERA5 GEE data for '{region_name}'... (1-2 mins)"):
+        # One-time warning message
+        info_placeholder = st.empty()
+        info_placeholder.info(f"'{region_name}' hasn't been loaded before — fetching live satellite data. This usually takes 2-3 minutes.")
+        
+        # Check for st.status compatibility
+        if hasattr(st, "status"):
+            with st.status(f"Setting up '{region_name}'...", expanded=True) as status:
+                status.write("🛰️ Fetching satellite + meteorology data from Earth Engine...")
+                result = subprocess.run(ingest_cmd, capture_output=True, text=True, check=True)
+                print(result.stdout)
+                
+                status.write("🧮 Regridding variables and calculating Proxy AQI...")
+                result = subprocess.run(preprocess_cmd, capture_output=True, text=True, check=True)
+                print(result.stdout)
+                
+                status.write("🔍 Running Isolation Forest chemical hotspot detector...")
+                result = subprocess.run(hotspot_cmd, capture_output=True, text=True, check=True)
+                print(result.stdout)
+                
+                status.update(label=f"'{region_name}' ready!", state="complete", expanded=False)
+        else:
+            # Fallback to sequential info placeholders
+            status_text = st.empty()
+            status_text.info("🛰️ Step 1/3: Ingesting satellite data from Earth Engine...")
             result = subprocess.run(ingest_cmd, capture_output=True, text=True, check=True)
-            print(result.stdout)
             
-        # Step 2: Preprocess
-        with st.spinner("Step 2/3: Regridding variables & calculating Proxy AQI..."):
+            status_text.info("🧮 Step 2/3: Regridding variables and calculating Proxy AQI...")
             result = subprocess.run(preprocess_cmd, capture_output=True, text=True, check=True)
-            print(result.stdout)
             
-        # Step 3: Hotspot
-        with st.spinner("Step 3/3: Running Isolation Forest hotspot detector..."):
+            status_text.info("🔍 Step 3/3: Running Isolation Forest chemical hotspot detector...")
             result = subprocess.run(hotspot_cmd, capture_output=True, text=True, check=True)
-            print(result.stdout)
+            status_text.empty()
             
+        info_placeholder.empty()
         st.success(f"Pipeline executed successfully for '{region_name}'!")
         
         # Clear Streamlit cache and trigger rerun
