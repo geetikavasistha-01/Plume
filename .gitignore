@@ -1,0 +1,26 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data Directory
+data/cache/
+data/processed/
+data/**/*.nc
+data/**/*.npy
+data/**/*.joblib
+
+# Virtual Environments
+venv/
+env/
+isro_env/
+.env
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
