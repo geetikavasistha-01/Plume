@@ -11,6 +11,7 @@ from sklearn.ensemble import IsolationForest
 # Add backend to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import config
+from geocode_utils import geocode_coordinates
 
 def main():
     parser = argparse.ArgumentParser(description="Find HCHO Hotspots via Isolation Forest")
@@ -90,6 +91,7 @@ def main():
     df['raw_score'] = model.decision_function(X)
     
     hcho_median = df['hcho'].median()
+    hcho_95th = df['hcho'].quantile(0.95)
     df['is_hotspot'] = (df['anomaly_pred'] == -1) & (df['hcho'] > hcho_median)
     
     min_dec = df['raw_score'].min()
@@ -104,6 +106,12 @@ def main():
     hotspots_df = hotspots_df.sort_values(by='hotspot_score', ascending=False)
     
     hotspots_list = hotspots_df[['lat', 'lon', 'hcho', 'no2', 'aod', 'aqi', 'hotspot_score']].to_dict(orient='records')
+    
+    # Geocode coordinates offline
+    coords = [(h['lat'], h['lon']) for h in hotspots_list]
+    locations = geocode_coordinates(coords)
+    for h, loc in zip(hotspots_list, locations):
+        h['location'] = loc
     
     # Construct a GeoJSON structure
     geojson_features = []
@@ -136,6 +144,7 @@ def main():
         'hotspots_count': len(hotspots_list),
         'hcho_spatial_median': float(hcho_median),
         'hcho_spatial_mean': float(df['hcho'].mean()),
+        'hcho_spatial_95th': float(hcho_95th),
         'hotspots': hotspots_list,
         'geojson': geojson
     }

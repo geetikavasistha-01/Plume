@@ -106,6 +106,8 @@ def load_keras_model(model_path):
 @st.cache_data
 def get_predictions_data(processed_path, X_path, y_path, metrics_path, model_path):
     import json
+    from backend.geocode_utils import geocode_coordinates
+    
     # Read netCDF metadata
     ds = xr.open_dataset(processed_path)
     # Load model locally via cache resource
@@ -132,6 +134,13 @@ def get_predictions_data(processed_path, X_path, y_path, metrics_path, model_pat
     # Transpose to (n_time_pred, n_lat, n_lon)
     pred_grid = np.transpose(pred_grid, (2, 0, 1))
     
+    # Batch geocode grid coordinates
+    grid_coords = []
+    for i in range(n_lat):
+        for j in range(n_lon):
+            grid_coords.append((float(ds.lat.values[i]), float(ds.lon.values[j])))
+    grid_locations = geocode_coordinates(grid_coords)
+    
     return {
         'time': ds.time.values,
         'lat': ds.lat.values,
@@ -140,7 +149,8 @@ def get_predictions_data(processed_path, X_path, y_path, metrics_path, model_pat
         'pred_grid': pred_grid,
         'y_actual': y,
         'preds': preds,
-        'metrics': metrics
+        'metrics': metrics,
+        'grid_locations': grid_locations
     }
 
 # Import helper
@@ -180,6 +190,7 @@ if data_pkg is not None:
     y_actual = data_pkg['y_actual']
     y_predicted = data_pkg['preds']
     metrics = data_pkg['metrics']
+    grid_locations = data_pkg['grid_locations']
     
     lookback = config.LOOKBACK_DAYS
     dates = pd.to_datetime(time_val[lookback:])
@@ -224,10 +235,31 @@ if data_pkg is not None:
     else:
         grid_slice = aqi_val_stack[lookback + date_idx]
         
+    # Dynamic Summary Card
+    def get_aqi_category_name(aqi_val):
+        if aqi_val <= 50:
+            return "Good", "🟢"
+        elif aqi_val <= 100:
+            return "Satisfactory", "🟢"
+        elif aqi_val <= 200:
+            return "Moderate", "🟡"
+        elif aqi_val <= 300:
+            return "Poor", "🟠"
+        elif aqi_val <= 400:
+            return "Very Poor", "🔴"
+        else:
+            return "Severe", "🔴"
+            
+    mean_aqi = float(np.mean(grid_slice))
+    category, emoji = get_aqi_category_name(mean_aqi)
+    summary_text = f"On **{selected_date.strftime('%Y-%m-%d')}**, the forecasted air quality in **{selected_region}** is expected to be **{category}** {emoji}, averaging an estimated Proxy AQI of **{mean_aqi:.1f}**."
+    st.markdown(f"<div style='font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem; background: rgba(102, 252, 241, 0.1); border-left: 4px solid #66fcf1; padding: 1rem; border-radius: 6px;'>{summary_text}</div>", unsafe_allow_html=True)
+        
     # Build dataframe for pydeck plotting using PolygonLayer
     records = []
     res = config.RESOLUTION
     half_res = res / 2.0
+    n_lon = len(lons)
     
     for i, lat in enumerate(lats):
         for j, lon in enumerate(lons):
@@ -253,10 +285,15 @@ if data_pkg is not None:
             if not (all(np.isfinite(c1)) and all(np.isfinite(c2)) and all(np.isfinite(c3)) and all(np.isfinite(c4))):
                 continue
                 
-            polygon = [c1, c2, c3, c4, c1]  # Closed ring (first and last match)
+            polygon = [c1, c2, c3, c4, c1]  # Closed ring
+            
+            # Pre-geocoded location lookup
+            loc_idx = i * n_lon + j
+            location = grid_locations[loc_idx] if loc_idx < len(grid_locations) else f"Lat {lat:.3f}, Lon {lon:.3f}"
             
             records.append({
                 'polygon': polygon,
+                'location': location,
                 'aqi': aqi_val,
                 'r': color[0],
                 'g': color[1],
@@ -293,7 +330,7 @@ if data_pkg is not None:
         initial_view_state=view_state,
         map_provider="carto",
         map_style="dark",
-        tooltip={"text": "AQI: {aqi}"}
+        tooltip={"text": "Location: {location}\nAQI: {aqi:.1f}"}
     ))
     
     # 3. Model Performance Section (Leaned down & packed)

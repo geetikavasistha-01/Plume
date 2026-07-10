@@ -195,8 +195,8 @@ if ds is not None and hotspots is not None:
     
     with col1:
         st.markdown(f"""
-        <div class='card'>
-            <div class='card-title'>Average Predicted AQI</div>
+        <div class='card' title='An estimated Air Quality Index derived from satellite pollutant readings (not a ground-station measurement).'>
+            <div class='card-title'>Average Predicted AQI ℹ️</div>
             <div class='card-value'>{avg_aqi:.1f}</div>
             <div class='card-desc'>Forecasted next-day average for study region</div>
         </div>

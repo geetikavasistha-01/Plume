@@ -98,6 +98,15 @@ else:
     hotspots_list = hotspots_data.get('hotspots', [])
     data_date = hotspots_data.get('data_date', 'N/A')
     
+    # 0. Plain language summary
+    if len(hotspots_list) > 0:
+        top_place = hotspots_list[0].get('location', f"Lat {hotspots_list[0]['lat']:.3f}, Lon {hotspots_list[0]['lon']:.3f}")
+        summary_text = f"On **{data_date}**, we detected **{len(hotspots_list)} out of {hotspots_data.get('total_grid_cells', 0)}** areas in **{selected_region}** with unusually high formaldehyde (HCHO) levels. The most affected area is near **{top_place}**."
+    else:
+        summary_text = f"On **{data_date}**, we found **no significant** formaldehyde (HCHO) hotspot anomalies across the **{hotspots_data.get('total_grid_cells', 0)}** grid cells of **{selected_region}**."
+        
+    st.markdown(f"<div style='font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem; background: rgba(199, 125, 255, 0.1); border-left: 4px solid #c77dff; padding: 1rem; border-radius: 6px;'>{summary_text}</div>", unsafe_allow_html=True)
+    
     # 1. Hotspots statistics row
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -108,14 +117,24 @@ else:
             <div class='text' style='font-size:0.85rem; color:#8b8c8d;'>Grid cells with anomalous HCHO columns</div>
         </div>
         """, unsafe_allow_html=True)
+        
+    hcho_median = hotspots_data.get('hcho_spatial_median', 0.0)
+    hcho_mean = hotspots_data.get('hcho_spatial_mean', 0.0)
+    hcho_95th = hotspots_data.get('hcho_spatial_95th', 0.0)
+    
     with col2:
         st.markdown(f"""
         <div class='card'>
-            <div class='card-title'>Spatial Median HCHO</div>
-            <div class='card-value'>{hotspots_data.get('hcho_spatial_median', 0.0):.2e}</div>
-            <div class='text' style='font-size:0.85rem; color:#8b8c8d;'>Median concentration (mol/m²)</div>
+            <div class='card-title'>HCHO Spatial Summary</div>
+            <div class='card-value'>{hcho_mean:.2e}</div>
+            <div class='text' style='font-size:0.85rem; color:#8b8c8d; margin-bottom: 0.3rem;'>Mean concentration (mol/m²)</div>
+            <div style='font-size:0.8rem; color:#c5c6c7; display:flex; justify-content:space-between;'>
+                <span>Median: <code>{hcho_median:.2e}</code></span>
+                <span>95%tile: <code>{hcho_95th:.2e}</code></span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
+        
     with col3:
         st.markdown(f"""
         <div class='card'>
@@ -224,9 +243,21 @@ else:
                 map_provider="carto",
                 map_style="dark",
                 tooltip={
-                    "text": "Hotspot Score: {hotspot_score:.1f}\nHCHO: {hcho:.2e}\nAQI: {aqi:.1f}"
+                    "text": "Location: {location}\nHotspot Score: {hotspot_score:.1f}\nHCHO: {hcho:.2e}\nAQI: {aqi:.1f}"
                 }
             ))
+            
+            # Map Legend
+            st.markdown("""
+            <div style='background: rgba(31, 40, 51, 0.65); padding: 0.8rem; border-radius: 8px; margin-top: 1rem; border: 1px solid rgba(199, 125, 255, 0.3);'>
+                <div style='font-weight: 600; font-size: 0.85rem; color: #c77dff; margin-bottom: 0.5rem;'>🔥 HOTSPOT ANOMALY SEVERITY GRADIENT</div>
+                <div style='display: flex; align-items: center; justify-content: space-between;'>
+                    <span style='font-size: 0.8rem; color: #8b8c8d;'>Moderate (Score 40-70)</span>
+                    <div style='height: 12px; flex-grow: 1; margin: 0 10px; border-radius: 3px; background: linear-gradient(to right, rgb(255, 126, 0), rgb(255, 0, 180));'></div>
+                    <span style='font-size: 0.8rem; color: #8b8c8d;'>Severe (Score 90-100)</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
         with right_col:
             st.markdown("<h3 style='color:#ffffff;'>Top Hotspot Locations Ranked</h3>", unsafe_allow_html=True)
@@ -234,6 +265,21 @@ else:
             # Show ranked hotspots table (top 15)
             rank_df = df_hotspots.head(15).copy()
             rank_df['Rank'] = np.arange(1, len(rank_df) + 1)
+            
+            # Add Severity Category
+            def get_severity_category(score):
+                if score <= 40:
+                    return "🟢 Low"
+                elif score <= 70:
+                    return "🟡 Moderate"
+                elif score <= 90:
+                    return "🟠 High"
+                else:
+                    return "🔴 Severe"
+            
+            rank_df['Severity'] = rank_df['hotspot_score'].map(get_severity_category)
+            rank_df['Nearest Area'] = rank_df['location'].fillna("N/A")
+            
             rank_df = rank_df.rename(columns={
                 'lat': 'Latitude',
                 'lon': 'Longitude',
@@ -248,9 +294,27 @@ else:
             rank_df['Severity Score'] = rank_df['Severity Score'].map(lambda x: f"{x:.1f}")
             
             st.dataframe(
-                rank_df[['Rank', 'Latitude', 'Longitude', 'HCHO (mol/m²)', 'Proxy AQI', 'Severity Score']],
+                rank_df[['Rank', 'Nearest Area', 'Severity', 'HCHO (mol/m²)', 'Proxy AQI', 'Severity Score']],
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                column_config={
+                    "Nearest Area": st.column_config.TextColumn(
+                        "Nearest Area",
+                        help="Resolved geographical place name using offline reverse geocoding."
+                    ),
+                    "Severity": st.column_config.TextColumn(
+                        "Severity",
+                        help="Categorical label representing the severity of the HCHO anomaly."
+                    ),
+                    "Proxy AQI": st.column_config.TextColumn(
+                        "Proxy AQI",
+                        help="An estimated Air Quality Index derived from satellite pollutant readings (not a ground-station measurement)."
+                    ),
+                    "Severity Score": st.column_config.TextColumn(
+                        "Severity Score",
+                        help="Isolation Forest anomaly score representing how outlying this grid cell is compared to others."
+                    )
+                }
             )
             
         # 3. Distribution details at bottom
