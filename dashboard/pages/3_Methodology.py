@@ -81,7 +81,7 @@ st.markdown("<div class='methodology-header'>Data & Model Pipeline Workflow</div
 st.markdown("The end-to-end data ingestion, preprocessing, forecasting, and anomaly detection workflow operates on the following structure:")
 
 # Load the pipeline flowchart image
-assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dashboard", "assets")
+assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
 image_path = os.path.join(assets_dir, "pipeline_flowchart.jpg")
 st.image(image_path, caption="End-to-End ISRO AQI & HCHO Pipeline Workflow Diagram", use_container_width=True)
 
