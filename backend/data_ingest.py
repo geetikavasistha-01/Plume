@@ -15,8 +15,9 @@ def get_synthetic_data(bbox, region_name):
     print(f"Generating synthetic datasets for region '{region_name}'...")
     
     # Dimensions
-    lats = np.arange(bbox['min_lat'], bbox['max_lat'] + 0.01, config.RESOLUTION)
-    lons = np.arange(bbox['min_lon'], bbox['max_lon'] + 0.01, config.RESOLUTION)
+    res = config.get_resolution(bbox)
+    lats = np.arange(bbox['min_lat'], bbox['max_lat'] + 0.01, res)
+    lons = np.arange(bbox['min_lon'], bbox['max_lon'] + 0.01, res)
     dates = pd.date_range(start=config.START_DATE, end=config.END_DATE - timedelta(days=1))
     
     n_lat = len(lats)
@@ -122,6 +123,8 @@ def pull_gee_data(bbox, region_name):
     ])
     
     dates = [config.START_DATE + timedelta(days=i) for i in range(60)]
+    start_date_str = dates[0].strftime('%Y-%m-%d')
+    end_date_str = (dates[-1] + timedelta(days=1)).strftime('%Y-%m-%d')
     
     # GEE Collections mapping
     collections = {
@@ -135,29 +138,40 @@ def pull_gee_data(bbox, region_name):
         'precip': ('ECMWF/ERA5_LAND/HOURLY', 'total_precipitation')
     }
     
-    scale = 5000
+    res = config.get_resolution(bbox)
+    scale = int(res * 100000)
+    print(f"Using gridding resolution: {res}° (scale={scale}m) for region '{region_name}'")
+    
     grids = {}
+    
+    # Create server-side list of dates for mapping
+    date_strings = [d.strftime('%Y-%m-%d') for d in dates]
+    date_list = ee.List(date_strings)
     
     for var, (coll_name, band_name) in collections.items():
         print(f"Fetching variable '{var}' from GEE collection '{coll_name}'...")
-        img_list = []
         
-        for d in dates:
-            d1_str = d.strftime('%Y-%m-%d')
-            d2_str = (d + timedelta(days=1)).strftime('%Y-%m-%d')
+        # Load collection once for the entire range
+        full_coll = ee.ImageCollection(coll_name) \
+            .filterDate(start_date_str, end_date_str) \
+            .select(band_name)
             
-            daily_coll = ee.ImageCollection(coll_name) \
-                .filterDate(d1_str, d2_str) \
-                .select(band_name)
+        def get_daily_mean(d_str):
+            d_str = ee.String(d_str)
+            d1 = ee.Date(d_str)
+            d2 = d1.advance(1, 'day')
+            daily = full_coll.filterDate(d1, d2)
             
-            img = ee.Algorithms.If(
-                daily_coll.size().gt(0),
-                daily_coll.mean(),
+            mean_img = ee.Algorithms.If(
+                daily.size().gt(0),
+                daily.mean(),
                 ee.Image.constant(0.0).rename(band_name)
             )
-            img_list.append(ee.Image(img))
+            return ee.Image(mean_img).set('system:time_start', d1.millis())
             
-        combined_img = ee.Image.cat(img_list)
+        # Map over the dates list on the GEE server
+        daily_images = ee.ImageCollection(date_list.map(get_daily_mean))
+        combined_img = daily_images.toBands()
         
         print(f"Converting GEE {var} image to numpy...")
         arr = geemap.ee_to_numpy(combined_img, region=aoi, scale=scale)

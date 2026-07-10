@@ -10,6 +10,19 @@ from backend import config
 importlib.reload(config)
 from dashboard.icon_utils import icon
 
+import time
+
+def is_cache_fresh(paths, max_age_hours=48):
+    """Checks if critical processed files exist and are fresher than max_age_hours."""
+    critical_files = [paths['processed_grid'], paths['hotspots'], paths['predictions']]
+    for f in critical_files:
+        if not os.path.exists(f):
+            return False
+        file_age_seconds = time.time() - os.path.getmtime(f)
+        if file_age_seconds > max_age_hours * 3600:
+            return False
+    return True
+
 def run_pipeline(region_name, bbox=None):
     """Executes the ingestion, preprocessing, and hotspot steps sequentially."""
     python_path = sys.executable
@@ -49,6 +62,21 @@ def run_pipeline(region_name, bbox=None):
         fire_analysis_cmd += extra_args
         transport_cmd += extra_args
         
+    in_streamlit = st.runtime.exists()
+    
+    if not in_streamlit:
+        print(f"Running pipeline for '{region_name}' on CLI background...")
+        subprocess.run(ingest_cmd, check=True)
+        subprocess.run(cpcb_cmd, check=True)
+        subprocess.run(preprocess_cmd, check=True)
+        subprocess.run(inference_cmd, check=True)
+        subprocess.run(hotspot_cmd, check=True)
+        subprocess.run(fire_ingest_cmd, check=True)
+        subprocess.run(fire_analysis_cmd, check=True)
+        subprocess.run(transport_cmd, check=True)
+        print("Pipeline execution complete.")
+        return
+        
     try:
         # One-time warning message
         info_placeholder = st.empty()
@@ -57,35 +85,35 @@ def run_pipeline(region_name, bbox=None):
         # Check for st.status compatibility
         if hasattr(st, "status"):
             with st.status(f"Setting up '{region_name}'...", expanded=True) as status:
-                status.write(f"{icon('satellite_alt', 18, '#66fcf1')} Step 1/8: Fetching satellite + meteorology data from Earth Engine...")
+                status.write(":material/satellite_alt: Step 1/8: Fetching satellite + meteorology data from Earth Engine...")
                 result = subprocess.run(ingest_cmd, capture_output=True, text=True, check=True)
                 print(result.stdout)
                 
-                status.write(f"{icon('domain', 18, '#66fcf1')} Step 2/8: Ingesting CPCB ground monitoring station data...")
+                status.write(":material/domain: Step 2/8: Ingesting CPCB ground monitoring station data...")
                 result = subprocess.run(cpcb_cmd, capture_output=True, text=True, check=True)
                 print(result.stdout)
                 
-                status.write(f"{icon('calculate', 18, '#66fcf1')} Step 3/8: Regridding variables and calculating targets...")
+                status.write(":material/calculate: Step 3/8: Regridding variables and calculating targets...")
                 result = subprocess.run(preprocess_cmd, capture_output=True, text=True, check=True)
                 print(result.stdout)
                 
-                status.write(f"{icon('psychology', 18, '#66fcf1')} Step 4/8: Running CNN-LSTM model predictions...")
+                status.write(":material/psychology: Step 4/8: Running CNN-LSTM model predictions...")
                 result = subprocess.run(inference_cmd, capture_output=True, text=True, check=True)
                 print(result.stdout)
                 
-                status.write(f"{icon('travel_explore', 18, '#66fcf1')} Step 5/8: Running Isolation Forest chemical hotspot detector...")
+                status.write(":material/travel_explore: Step 5/8: Running Isolation Forest chemical hotspot detector...")
                 result = subprocess.run(hotspot_cmd, capture_output=True, text=True, check=True)
                 print(result.stdout)
                 
-                status.write(f"{icon('local_fire_department', 18, '#66fcf1')} Step 6/8: Fetching MODIS/VIIRS active fire points...")
+                status.write(":material/local_fire_department: Step 6/8: Fetching MODIS/VIIRS active fire points...")
                 result = subprocess.run(fire_ingest_cmd, capture_output=True, text=True, check=True)
                 print(result.stdout)
                 
-                status.write(f"{icon('bar_chart', 18, '#66fcf1')} Step 7/8: Correlating active fires with HCHO plumes...")
+                status.write(":material/bar_chart: Step 7/8: Correlating active fires with HCHO plumes...")
                 result = subprocess.run(fire_analysis_cmd, capture_output=True, text=True, check=True)
                 print(result.stdout)
                 
-                status.write(f"{icon('air', 18, '#66fcf1')} Step 8/8: Simulating wind rose advection trajectories...")
+                status.write(":material/air: Step 8/8: Simulating wind rose advection trajectories...")
                 result = subprocess.run(transport_cmd, capture_output=True, text=True, check=True)
                 print(result.stdout)
                 
@@ -93,21 +121,21 @@ def run_pipeline(region_name, bbox=None):
         else:
             # Fallback
             status_text = st.empty()
-            status_text.info(f"{icon('satellite_alt', 18)} Step 1/8: Ingesting satellite data from Earth Engine...")
+            status_text.info(":material/satellite_alt: Step 1/8: Ingesting satellite data from Earth Engine...")
             subprocess.run(ingest_cmd, capture_output=True, text=True, check=True)
-            status_text.info(f"{icon('domain', 18)} Step 2/8: Ingesting CPCB ground monitoring stations...")
+            status_text.info(":material/domain: Step 2/8: Ingesting CPCB ground monitoring stations...")
             subprocess.run(cpcb_cmd, capture_output=True, text=True, check=True)
-            status_text.info(f"{icon('calculate', 18)} Step 3/8: Preprocessing grid alignment...")
+            status_text.info(":material/calculate: Step 3/8: Preprocessing grid alignment...")
             subprocess.run(preprocess_cmd, capture_output=True, text=True, check=True)
-            status_text.info(f"{icon('psychology', 18)} Step 4/8: Running CNN-LSTM model predictions...")
+            status_text.info(":material/psychology: Step 4/8: Running CNN-LSTM model predictions...")
             subprocess.run(inference_cmd, capture_output=True, text=True, check=True)
-            status_text.info(f"{icon('travel_explore', 18)} Step 5/8: Running Isolation Forest hotspot detector...")
+            status_text.info(":material/travel_explore: Step 5/8: Running Isolation Forest hotspot detector...")
             subprocess.run(hotspot_cmd, capture_output=True, text=True, check=True)
-            status_text.info(f"{icon('local_fire_department', 18)} Step 6/8: Ingesting MODIS/VIIRS active fires...")
+            status_text.info(":material/local_fire_department: Step 6/8: Ingesting MODIS/VIIRS active fires...")
             subprocess.run(fire_ingest_cmd, capture_output=True, text=True, check=True)
-            status_text.info(f"{icon('bar_chart', 18)} Step 7/8: Running active fire correlation analysis...")
+            status_text.info(":material/bar_chart: Step 7/8: Running active fire correlation analysis...")
             subprocess.run(fire_analysis_cmd, capture_output=True, text=True, check=True)
-            status_text.info(f"{icon('air', 18)} Step 8/8: Running wind advection calculations...")
+            status_text.info(":material/air: Step 8/8: Running wind advection calculations...")
             subprocess.run(transport_cmd, capture_output=True, text=True, check=True)
             status_text.empty()
             
@@ -175,11 +203,11 @@ def render_sidebar_and_get_region():
         region_slug = config.get_region_slug(selected_region)
         
         paths = config.get_paths(region_slug)
-        if not os.path.exists(paths['processed_grid']) or not os.path.exists(paths['hotspots']):
+        if not is_cache_fresh(paths, max_age_hours=48):
             if st.sidebar.button("Process Custom Coordinates"):
                 run_pipeline(selected_region, bbox)
             else:
-                st.sidebar.info("Cache missing. Click 'Process Custom Coordinates' to run pipeline.")
+                st.sidebar.info("Cache missing or older than 48 hours. Click 'Process Custom Coordinates' to run pipeline.")
                 st.stop()
             
     elif selected_mode == "Search Location...":
@@ -220,8 +248,8 @@ def render_sidebar_and_get_region():
             paths = config.get_paths(region_slug)
             
             # Check cache
-            if not os.path.exists(paths['processed_grid']) or not os.path.exists(paths['hotspots']):
-                st.sidebar.info(f"Cache missing for '{selected_region}'. Triggering pipeline...")
+            if not is_cache_fresh(paths, max_age_hours=48):
+                st.sidebar.info(f"Cache missing or older than 48 hours for '{selected_region}'. Triggering pipeline...")
                 run_pipeline(selected_region, bbox)
         else:
             st.sidebar.info("Enter a location name to search.")
@@ -239,8 +267,8 @@ def render_sidebar_and_get_region():
             'max_lon': region_coords['lon_max']
         }
         paths = config.get_paths(region_slug)
-        if not os.path.exists(paths['processed_grid']) or not os.path.exists(paths['hotspots']):
-            st.sidebar.info(f"Cache missing for '{selected_region}'. Triggering pipeline...")
+        if not is_cache_fresh(paths, max_age_hours=48):
+            st.sidebar.info(f"Cache missing or older than 48 hours for '{selected_region}'. Triggering pipeline...")
             run_pipeline(selected_region, bbox)
             
     paths = config.get_paths(region_slug)
@@ -254,7 +282,8 @@ def render_sidebar_and_get_region():
         st.markdown(f"Lat: `{bbox['min_lat']:.2f} - {bbox['max_lat']:.2f}`")
         st.markdown(f"Lon: `{bbox['min_lon']:.2f} - {bbox['max_lon']:.2f}`")
         st.markdown("**Temporal Resolution:**\nDaily")
-        st.markdown(f"**Spatial Grid Size:**\n{config.RESOLUTION}° (~5km)")
+        res = config.get_resolution(bbox)
+        st.markdown(f"**Spatial Grid Size:**\n{res}° (~{int(res * 100)}km)")
         
     # Collapsible Data Sources
     with st.sidebar.expander("📚 Data Sources", expanded=False):

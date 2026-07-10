@@ -159,7 +159,7 @@ def show(selected_region, region_slug, bbox, paths):
             
             # Build dataframe for pydeck plotting using PolygonLayer
             records = []
-            res = config.RESOLUTION
+            res = config.get_resolution(bbox)
             half_res = res / 2.0
             
             for idx, row in df_hotspots.iterrows():

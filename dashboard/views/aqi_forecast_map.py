@@ -281,7 +281,7 @@ def show(selected_region, region_slug, bbox, paths):
             
         # Build dataframe for pydeck plotting using PolygonLayer
         records = []
-        res = config.RESOLUTION
+        res = float(np.abs(lats[1] - lats[0])) if len(lats) > 1 else config.RESOLUTION
         half_res = res / 2.0
         n_lon = len(lons)
         
