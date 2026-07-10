@@ -1,3 +1,22 @@
+# 🛰️ ISRO AQI & HCHO
+
+**Satellite-only next-day air quality forecasting and biomass-burning detection — anywhere in India, no ground sensor required.**
+
+[![Model R²](https://img.shields.io/badge/Model_R²-0.890-brightgreen)]()
+[![Correlation](https://img.shields.io/badge/Correlation-0.938-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/Coverage-All_India-blue)]()
+
+Ground AQI monitors cover a few hundred points in India. This pipeline uses Sentinel-5P TROPOMI and ERA5 reanalysis data to forecast tomorrow's AQI on a 5km grid **anywhere in the country**, flags formaldehyde hotspots that signal crop/forest burning using Isolation Forest anomaly detection, cross-references them against NASA FIRMS active-fire data, and projects 24-hour downwind smoke transport — all from space, cross-calibrated against real CPCB ground stations where available.
+
+**⚡ Quick facts:**
+- 🎯 Forecast accuracy: **R² = 0.89**, MAE = 15.4 AQI units
+- 🔥 Hotspot detection: Isolation Forest over multi-pollutant satellite grids, reverse-geocoded to real place names
+- 🌬️ Wind advection modeling to trace pollution transport, not just origin
+- 🗺️ Works on any Indian city, district, or state — not a fixed shortlist
+
+👉 **[Full write-up below](#the-problem)** for the complete story, architecture, and honest limitations.
+
+---
 # 🛰️ ISRO AQI & HCHO — Satellite-Driven Air Quality Intelligence for India
 
 **Predicting tomorrow's air, and finding out why today's air is bad — using nothing but satellites.**
