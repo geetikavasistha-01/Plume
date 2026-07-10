@@ -80,104 +80,10 @@ st.info("Note: The CNN-LSTM forecasting model was trained on Delhi-NCR data. Oth
 st.markdown("<div class='methodology-header'>Data & Model Pipeline Workflow</div>", unsafe_allow_html=True)
 st.markdown("The end-to-end data ingestion, preprocessing, forecasting, and anomaly detection workflow operates on the following structure:")
 
-# Flowchart DOT string
-flowchart_dot = """
-digraph G {
-    bgcolor="#1f2833"
-    color="#45a29e"
-    node [style=filled, fillcolor="#0b0c10", color="#66fcf1", fontcolor="#ffffff", shape=box, style="rounded,filled", fontname="Outfit", fontsize=11]
-    edge [color="#66fcf1", fontname="Outfit", fontcolor="#ffffff", fontsize=10]
-    
-    "Sentinel-5P TROPOMI" -> "Data Ingestion (data_ingest.py)";
-    "ERA5 Land" -> "Data Ingestion (data_ingest.py)";
-    "Data Ingestion (data_ingest.py)" -> "Raw NetCDF Cache (raw_grid.nc)";
-    "Raw NetCDF Cache (raw_grid.nc)" -> "Feature Preprocessing (preprocess.py)";
-    "Feature Preprocessing (preprocess.py)" -> "ML Sequences (X, y)";
-    "Feature Preprocessing (preprocess.py)" -> "Proxy AQI Target";
-    "ML Sequences (X, y)" -> "CNN-1D + LSTM Model (model.py)";
-    "Proxy AQI Target" -> "Isolation Forest Detector (hotspot.py)";
-    
-    "CNN-1D + LSTM Model (model.py)" -> "Streamlit Dashboard" [color="#c77dff", label="cnn_lstm_aqi.keras"];
-    "Isolation Forest Detector (hotspot.py)" -> "Streamlit Dashboard" [color="#ff7e00", label="hotspots.json"];
-    
-    "CNN-1D + LSTM Model (model.py)" [color="#c77dff", fontcolor="#c77dff"];
-    "Isolation Forest Detector (hotspot.py)" [color="#ff7e00", fontcolor="#ff7e00"];
-    "Streamlit Dashboard" [fillcolor="#0b0c10", color="#66fcf1", fontcolor="#66fcf1", penwidth=2];
-}
-"""
-
-# Custom SVG fallback diagram
-pipeline_svg = """
-<div style="display: flex; justify-content: center; width: 100%; margin-bottom: 2rem;">
-<svg viewBox="0 0 1000 480" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="background:#1f2833; border: 1px solid rgba(102, 252, 241, 0.3); border-radius: 12px; padding: 15px;">
-  <defs>
-    <linearGradient id="tealGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1f2833" />
-      <stop offset="100%" stop-color="#0f1115" />
-    </linearGradient>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#66fcf1" />
-    </marker>
-  </defs>
-  
-  <rect x="20" y="50" width="170" height="60" rx="8" fill="url(#tealGrad)" stroke="#66fcf1" stroke-width="2" />
-  <text x="105" y="80" fill="#ffffff" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Sentinel-5P TROPOMI</text>
-  <text x="105" y="95" fill="#8b8c8d" font-size="10" font-family="'Outfit', sans-serif" text-anchor="middle">HCHO, NO2, UV Aerosol AI</text>
-
-  <rect x="20" y="150" width="170" height="60" rx="8" fill="url(#tealGrad)" stroke="#66fcf1" stroke-width="2" />
-  <text x="105" y="180" fill="#ffffff" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">ERA5 Land Reanalysis</text>
-  <text x="105" y="195" fill="#8b8c8d" font-size="10" font-family="'Outfit', sans-serif" text-anchor="middle">Temp, Wind, Rain, Dewpoint</text>
-
-  <rect x="250" y="100" width="160" height="60" rx="8" fill="url(#tealGrad)" stroke="#66fcf1" stroke-width="2" />
-  <text x="330" y="130" fill="#66fcf1" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Data Ingestion</text>
-  <text x="330" y="145" fill="#e0e0e0" font-size="10" font-family="'Outfit', sans-serif" text-anchor="middle">data_ingest.py (GEE Pull)</text>
-
-  <rect x="470" y="100" width="150" height="60" rx="8" fill="url(#tealGrad)" stroke="#45a29e" stroke-width="1.5" />
-  <text x="545" y="130" fill="#ffffff" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Raw NetCDF Cache</text>
-  <text x="545" y="145" fill="#8b8c8d" font-size="10" font-family="'Outfit', sans-serif" text-anchor="middle">raw_grid.nc</text>
-
-  <rect x="680" y="100" width="170" height="60" rx="8" fill="url(#tealGrad)" stroke="#66fcf1" stroke-width="2" />
-  <text x="765" y="130" fill="#66fcf1" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Feature Preprocessing</text>
-  <text x="765" y="145" fill="#e0e0e0" font-size="10" font-family="'Outfit', sans-serif" text-anchor="middle">preprocess.py (Grid Align)</text>
-
-  <rect x="540" y="240" width="160" height="50" rx="6" fill="url(#tealGrad)" stroke="#45a29e" stroke-width="1.5" />
-  <text x="620" y="265" fill="#ffffff" font-size="11" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">ML Sequences (X, y)</text>
-  <text x="620" y="280" fill="#8b8c8d" font-size="9" font-family="'Outfit', sans-serif" text-anchor="middle">X.npy, y.npy (7d lookback)</text>
-
-  <rect x="800" y="240" width="160" height="50" rx="6" fill="url(#tealGrad)" stroke="#45a29e" stroke-width="1.5" />
-  <text x="880" y="265" fill="#ffffff" font-size="11" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Proxy AQI Target</text>
-  <text x="880" y="280" fill="#8b8c8d" font-size="9" font-family="'Outfit', sans-serif" text-anchor="middle">Calculated Pollutant Index</text>
-
-  <rect x="525" y="340" width="190" height="60" rx="8" fill="url(#tealGrad)" stroke="#c77dff" stroke-width="2" />
-  <text x="620" y="370" fill="#c77dff" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">CNN-1D + LSTM Model</text>
-  <text x="620" y="385" fill="#e0e0e0" font-size="10" font-family="'Outfit', sans-serif" text-anchor="middle">model.py -> cnn_lstm_aqi.keras</text>
-
-  <rect x="785" y="340" width="190" height="60" rx="8" fill="url(#tealGrad)" stroke="#ff7e00" stroke-width="2" />
-  <text x="880" y="370" fill="#ff7e00" font-size="12" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Isolation Forest Detector</text>
-  <text x="880" y="385" fill="#e0e0e0" font-size="10" font-family="'Outfit', sans-serif" text-anchor="middle">hotspot.py -> hotspots.json</text>
-
-  <rect x="655" y="430" width="220" height="40" rx="6" fill="url(#tealGrad)" stroke="#66fcf1" stroke-width="2.5" />
-  <text x="765" y="455" fill="#66fcf1" font-size="13" font-weight="bold" font-family="'Outfit', sans-serif" text-anchor="middle">Streamlit Dashboard</text>
-
-  <path d="M 190 80 L 220 80 L 220 115 L 242 115" fill="none" stroke="#66fcf1" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 190 180 L 220 180 L 220 145 L 242 145" fill="none" stroke="#66fcf1" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 410 130 L 462 130" fill="none" stroke="#66fcf1" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 620 130 L 672 130" fill="none" stroke="#66fcf1" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 765 160 L 765 210 L 620 210 L 620 232" fill="none" stroke="#66fcf1" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 765 160 L 765 210 L 880 210 L 880 232" fill="none" stroke="#66fcf1" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 620 290 L 620 332" fill="none" stroke="#c77dff" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 880 290 L 880 332" fill="none" stroke="#ff7e00" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 620 400 L 620 450 L 647 450" fill="none" stroke="#c77dff" stroke-width="1.5" marker-end="url(#arrow)" />
-  <path d="M 880 400 L 880 450 L 883 450" fill="none" stroke="#ff7e00" stroke-width="1.5" marker-end="url(#arrow)" />
-</svg>
-</div>
-"""
-
-# Try rendering Graphviz, otherwise fallback to SVG
-try:
-    st.graphviz_chart(flowchart_dot, use_container_width=True)
-except Exception:
-    st.markdown(pipeline_svg, unsafe_allow_html=True)
+# Load the pipeline flowchart image
+assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dashboard", "assets")
+image_path = os.path.join(assets_dir, "pipeline_flowchart.jpg")
+st.image(image_path, caption="End-to-End ISRO AQI & HCHO Pipeline Workflow Diagram", use_container_width=True)
 
 st.divider()
 
