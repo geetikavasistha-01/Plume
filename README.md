@@ -1,4 +1,4 @@
-# ISRO Air Quality Index (AQI) & Formaldehyde (HCHO) Prediction Pipeline
+#  Air Quality Index (AQI) & Formaldehyde (HCHO) Prediction Pipeline
 
 A full-stack machine learning project built for predicting surface Air Quality Index (AQI) over India and detecting Formaldehyde (HCHO) hotspots using Sentinel-5P satellite observations and ERA5-Land reanalysis products. Serving a premium, editorial-dark Streamlit dashboard.
 
