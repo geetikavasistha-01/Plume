@@ -115,8 +115,17 @@ def pull_gee_data(bbox, region_name):
     print(f"Initializing Earth Engine for region '{region_name}' with Project ID: {config.GEE_PROJECT_ID}...")
     try:
         import streamlit as st
-        # If running inside Streamlit Cloud and the gcp secrets block is defined
-        if "gcp" in st.secrets:
+        # 1. Check if personal user credentials JSON string is provided in Streamlit secrets
+        if "gee_credentials" in st.secrets:
+            print("Writing personal GEE credentials JSON to ~/.config/earthengine/credentials...")
+            credentials_dir = os.path.expanduser("~/.config/earthengine")
+            os.makedirs(credentials_dir, exist_ok=True)
+            credentials_path = os.path.join(credentials_dir, "credentials")
+            with open(credentials_path, "w") as f:
+                f.write(st.secrets["gee_credentials"])
+            ee.Initialize(project=config.GEE_PROJECT_ID)
+        # 2. Check if service account secrets are provided
+        elif "gcp" in st.secrets:
             print("Authenticating with service account credentials from st.secrets['gcp']...")
             from google.oauth2 import service_account
             gcp_info = st.secrets["gcp"]
