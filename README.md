@@ -1,4 +1,4 @@
-# <img width="42" height="42" alt="Air icon" style="vertical-align: middle; border-radius: 8px; margin-right: 8px;" src="https://github.com/user-attachments/assets/aefbb97d-3025-46fe-8651-181347fa3ff6" /> Plume — National Air ForesightPlume — National Air Foresight
+# <img width="42" height="42" alt="Air icon" style="vertical-align: middle; border-radius: 8px; margin-right: 8px;" src="https://github.com/user-attachments/assets/aefbb97d-3025-46fe-8651-181347fa3ff6" /> Plume — National Air Foresight
 ### *From Orbit to Ground Truth*
 
 <img width="1377" height="911" alt="Screenshot 2026-07-11 at 2 38 28 AM" src="https://github.com/user-attachments/assets/b39bbe5c-91c3-4e41-95b4-95524a74ea9e" />
