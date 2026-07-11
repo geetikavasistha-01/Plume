@@ -37,25 +37,75 @@ def build_model(input_shape):
     return model
 
 def main():
-    X_path = os.path.join(config.PROCESSED_DIR, "X.npy")
-    y_path = os.path.join(config.PROCESSED_DIR, "y.npy")
-    is_ground_path = os.path.join(config.PROCESSED_DIR, "is_ground.npy")
+    import argparse
+    import glob
     
-    if not (os.path.exists(X_path) and os.path.exists(y_path)):
-        print(f"Error: Processed data not found at {config.PROCESSED_DIR}. Run preprocess.py first.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--regions", type=str, default="all", help="Comma-separated list of regions to train on, or 'all'")
+    args = parser.parse_args()
+    
+    processed_dir = config.PROCESSED_DIR
+    
+    if args.regions.lower() == "all":
+        # Load all regional X_*.npy files (X.npy is excluded because it does not have the underscore)
+        x_files = sorted(glob.glob(os.path.join(processed_dir, "X_*.npy")))
+    else:
+        # Load specific comma-separated regions
+        regions_list = [r.strip() for r in args.regions.split(",")]
+        x_files = []
+        for r in regions_list:
+            slug = config.get_region_slug(r)
+            f_path = os.path.join(processed_dir, f"X_{slug}.npy")
+            if os.path.exists(f_path):
+                x_files.append(f_path)
+            else:
+                print(f"Warning: Dataset for region '{r}' (slug: {slug}) not found at {f_path}. Skipping.")
+                
+    if not x_files:
+        print("Error: No regional training datasets found!")
         sys.exit(1)
         
-    print("Loading preprocessed tensors...")
-    X = np.load(X_path)
-    y = np.load(y_path)
+    print(f"Found {len(x_files)} regional datasets to combine:")
+    X_list = []
+    y_list = []
+    is_ground_list = []
     
-    if os.path.exists(is_ground_path):
-        is_ground = np.load(is_ground_path)
-    else:
-        print("Warning: is_ground.npy not found, assuming all false.")
-        is_ground = np.zeros_like(y, dtype=bool)
+    for f in x_files:
+        basename = os.path.basename(f)
+        region_slug = basename.replace("X_", "").replace(".npy", "")
+        y_file = os.path.join(processed_dir, f"y_{region_slug}.npy")
+        is_ground_file = os.path.join(processed_dir, f"is_ground_{region_slug}.npy")
         
-    print(f"Data shapes: X={X.shape}, y={y.shape}, is_ground={is_ground.shape}")
+        if not os.path.exists(y_file):
+            print(f"Warning: Target file {y_file} missing for {region_slug}. Skipping.")
+            continue
+            
+        print(f" - Loading {region_slug}...")
+        X_reg = np.load(f)
+        y_reg = np.load(y_file)
+        
+        if os.path.exists(is_ground_file):
+            is_ground_reg = np.load(is_ground_file)
+        else:
+            is_ground_reg = np.zeros_like(y_reg, dtype=bool)
+            
+        X_list.append(X_reg)
+        y_list.append(y_reg)
+        is_ground_list.append(is_ground_reg)
+        
+    X = np.concatenate(X_list, axis=0)
+    y = np.concatenate(y_list, axis=0)
+    is_ground = np.concatenate(is_ground_list, axis=0)
+    
+    # Save the consolidated training files as the default dataset
+    X_default_path = os.path.join(processed_dir, "X.npy")
+    y_default_path = os.path.join(processed_dir, "y.npy")
+    is_ground_default_path = os.path.join(processed_dir, "is_ground.npy")
+    np.save(X_default_path, X)
+    np.save(y_default_path, y)
+    np.save(is_ground_default_path, is_ground)
+    
+    print(f"\nConsolidated dataset shape: X={X.shape}, y={y.shape}, is_ground={is_ground.shape}")
     
     # Split into Train and Validation
     X_train, X_val, y_train, y_val, is_ground_train, is_ground_val = train_test_split(

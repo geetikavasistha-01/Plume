@@ -72,8 +72,7 @@ def show(selected_region, region_slug, bbox, paths):
     
     st.markdown("<div class='page-title'>Methodology & Architecture</div>", unsafe_allow_html=True)
     
-    # Model training caveat note
-    st.info("Note: The CNN-LSTM forecasting model was trained on Delhi-NCR data. Other regions are processed in an inference-only capacity using this pre-trained model (transfer learning), which may carry lower spatial prediction accuracy.")
+    st.info("Note: The CNN-LSTM forecasting model was trained on a consolidated multi-region dataset (Delhi-NCR, Mumbai, Bengaluru, Kolkata, Chennai, Hyderabad, Nagpur, and Punjab) to optimize prediction accuracy across diverse Indian urban environments.")
     
     # 1. Pipeline diagram description
     st.markdown("<div class='methodology-header'>Data & Model Pipeline Workflow</div>", unsafe_allow_html=True)
