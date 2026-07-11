@@ -19,7 +19,7 @@ from dashboard.icon_utils import inject_material_icons, icon
 # Set page config
 st.set_page_config(
     page_title="ISRO AQI & HCHO Pipeline",
-    page_icon=":material/satellite_alt:",
+    page_icon="dashboard/assets/logo.jpg",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -171,12 +171,19 @@ metrics = data['metrics']
 # --- TOP NAVIGATION BAR ---
 logo_col, nav_col = st.columns([1.8, 3.2])
 
+def get_image_base64(path):
+    if os.path.exists(path):
+        import base64
+        with open(path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    return ""
+
 with logo_col:
+    logo_base64 = get_image_base64("dashboard/assets/logo.jpg")
+    logo_src = f"data:image/jpeg;base64,{logo_base64}" if logo_base64 else ""
     logo_html = f"""
-    <div style="display: flex; align-items: center; gap: 10px; padding-top: 0.5rem; margin-bottom: 1rem;">
-        <span style="font-size: 24px; color: #66fcf1; display: inline-flex; align-items: center;">
-            {icon('satellite_alt', 28, '#66fcf1')}
-        </span>
+    <div style="display: flex; align-items: center; gap: 12px; padding-top: 0.2rem; margin-bottom: 1rem;">
+        <img src="{logo_src}" style="height: 34px; width: 34px; border-radius: 6px; object-fit: cover;" />
         <span style="font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">
             ISRO AQI & HCHO
         </span>
