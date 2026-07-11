@@ -58,7 +58,7 @@ A standing banner is honest about a real constraint: the underlying CNN-LSTM was
 
 An Isolation Forest model scans every grid cell's multi-pollutant signature and flags the ones that look chemically abnormal — the satellite equivalent of "something is burning here."
 
-<img width="1366" height="826" alt="Screenshot 2026-07-11 at 2 38 50 AM" src="https://github.com/user-attachments/assets/d5a2a9e8-6dbf-4b21-92d8-daef4f8a91d0" />
+<img width="1015" height="662" alt="Screenshot 2026-07-11 at 11 21 08 AM" src="https://github.com/user-attachments/assets/684485ce-c3da-430a-a9a6-a18abc43e104" />
 Formaldehyde Hotspot Detection page, showing 215/4624 flagged cells and the ranked hotspot table.
 
 On a recent run over Punjab, the model flagged **215 of 4,624 cells (≈4.6%)** as anomalous, with a mean HCHO concentration of 1.92×10⁻⁴ mol/m² (median 2.13×10⁻⁴, 95th percentile 4.52×10⁻⁴). The single most-affected location: **Pathankot, Punjab**, with an anomaly score of 91.7 — squarely in the "Severe" band.
