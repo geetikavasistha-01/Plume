@@ -14,11 +14,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import importlib
 from backend import config
 importlib.reload(config)
+from dashboard.icon_utils import inject_material_icons, icon
 
 # Set page config
 st.set_page_config(
     page_title="ISRO AQI & HCHO Pipeline",
-    page_icon="📡",
+    page_icon="dashboard/assets/logo.jpg",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -124,6 +125,7 @@ custom_css = """
 </style>
 """
 st.markdown(custom_css, unsafe_allow_html=True)
+inject_material_icons(st)
 
 # Import helper
 from dashboard import helper
@@ -166,157 +168,226 @@ ds = data['ds']
 hotspots = data['hotspots']
 metrics = data['metrics']
 
-# Main Title Header
-st.markdown("<div class='title-gradient'>AQI & HCHO Prediction Pipeline</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Satellite-driven deep learning air quality forecasting and chemical hotspot anomaly detection over India</div>", unsafe_allow_html=True)
+# --- TOP NAVIGATION BAR ---
+logo_col, nav_col = st.columns([1.8, 3.2])
 
-# Live Status Info Banner
-if ds is not None:
-    is_demo = ds.attrs.get('is_demo', 'false') == 'true'
-    if is_demo:
-        st.markdown(f"<div class='info-banner'><span class='highlight'>⚠️ Demo Mode Active:</span> Operating on simulated spatiotemporal dataset for <span class='highlight'>{selected_region}</span>. Earth Engine project authorization pending.</div>", unsafe_allow_html=True)
+def get_image_base64(path):
+    if os.path.exists(path):
+        import base64
+        with open(path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    return ""
+
+with logo_col:
+    logo_base64 = get_image_base64("dashboard/assets/logo.jpg")
+    logo_src = f"data:image/jpeg;base64,{logo_base64}" if logo_base64 else ""
+    logo_html = f"""
+    <div style="display: flex; align-items: center; gap: 12px; padding-top: 0.2rem; margin-bottom: 1rem;">
+        <img src="{logo_src}" style="height: 34px; width: 34px; border-radius: 6px; object-fit: cover;" />
+        <span style="font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">
+            ISRO AQI & HCHO
+        </span>
+    </div>
+    """
+    st.markdown(logo_html, unsafe_allow_html=True)
+
+with nav_col:
+    from streamlit_option_menu import option_menu
+    selected_page = option_menu(
+        menu_title=None,
+        options=["Overview", "AQI Forecast Map", "HCHO Hotspots", "Methodology"],
+        icons=["dashboard", "map", "location_searching", "menu_book"],
+        menu_icon="cast",
+        default_index=0,
+        orientation="horizontal",
+        styles={
+            "container": {"padding": "0!important", "background-color": "transparent"},
+            "icon": {"color": "#8b8c8d", "font-size": "15px"}, 
+            "nav-link": {
+                "font-family": "'Outfit', sans-serif",
+                "font-size": "14px",
+                "text-align": "center",
+                "margin": "0px",
+                "color": "#c5c6c7",
+                "background-color": "transparent",
+                "border-radius": "8px",
+                "padding": "6px 12px",
+                "transition": "color 0.15s ease-in-out, background-color 0.15s ease-in-out"
+            },
+            "nav-link-selected": {"background-color": "rgba(102, 252, 241, 0.15)", "color": "#66fcf1", "font-weight": "600", "border": "1px solid rgba(102, 252, 241, 0.3)"},
+        }
+    )
+
+st.markdown("---")
+
+def show_overview(selected_region, region_slug, bbox, paths, ds, hotspots, metrics):
+    # Main Title Header
+    st.markdown("<div class='title-gradient'>AQI & HCHO Prediction Pipeline</div>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitle'>Satellite-driven deep learning air quality forecasting and chemical hotspot anomaly detection over India</div>", unsafe_allow_html=True)
+    
+    # Live Status Info Banner
+    if ds is not None:
+        is_demo = ds.attrs.get('is_demo', 'false') == 'true'
+        if is_demo:
+            st.markdown(f"<div class='info-banner'><span class='highlight'>{icon('warning', 18, '#66fcf1')} Demo Mode Active:</span> Operating on simulated spatiotemporal dataset for <span class='highlight'>{selected_region}</span>. Earth Engine project authorization pending.</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='info-banner'><span class='highlight'>{icon('satellite_alt', 18, '#66fcf1')} Live GEE Mode Active:</span> Successfully processed 60 days of real satellite observation data using Earth Engine project <span class='highlight'>{config.GEE_PROJECT_ID}</span> for <span class='highlight'>{selected_region}</span>.</div>", unsafe_allow_html=True)
+            
+        # Model caveat banner for non-Delhi-NCR regions
+        if selected_region != "Delhi-NCR":
+            st.info("Note: The forecasting model was trained on Delhi-NCR data. Predictions for other regions are approximate and may carry lower accuracy.")
     else:
-        st.markdown(f"<div class='info-banner'><span class='highlight'>📡 Live GEE Mode Active:</span> Successfully processed 60 days of real satellite observation data using Earth Engine project <span class='highlight'>{config.GEE_PROJECT_ID}</span> for <span class='highlight'>{selected_region}</span>.</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='info-banner'><span class='highlight'>{icon('error', 18, '#ff6b6b')} Error:</span> Processed pipeline files not found. Please run the backend pipeline to generate results.</div>", unsafe_allow_html=True)
         
-    # Model caveat banner for non-Delhi-NCR regions
-    if selected_region != "Delhi-NCR":
-        st.info("Note: The forecasting model was trained on Delhi-NCR data. Predictions for other regions are approximate and may carry lower accuracy.")
-else:
-    st.markdown("<div class='info-banner'><span class='highlight'>❌ Error:</span> Processed pipeline files not found. Please run the backend pipeline to generate results.</div>", unsafe_allow_html=True)
-
-# Main Dashboard Layout
-if ds is not None and hotspots is not None:
-    # 1. Summary Metrics Cards (Row 1)
-    col1, col2, col3, col4 = st.columns(4)
-    
-    # Avg AQI
-    latest_aqi = ds['aqi'].values[-1]
-    avg_aqi = float(np.mean(latest_aqi))
-    
-    with col1:
-        st.markdown(f"""
-        <div class='card' title='An estimated Air Quality Index derived from satellite pollutant readings (not a ground-station measurement).'>
-            <div class='card-title'>Average Predicted AQI ℹ️</div>
-            <div class='card-value'>{avg_aqi:.1f}</div>
-            <div class='card-desc'>Forecasted next-day average for study region</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Main Dashboard Layout
+    if ds is not None and hotspots is not None:
+        # 1. Summary Metrics Cards (Row 1)
+        col1, col2, col3, col4 = st.columns(4)
         
-    # Active Hotspots
-    h_count = hotspots.get('hotspots_count', 0)
-    with col2:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-title'>Active HCHO Hotspots</div>
-            <div class='card-value'>{h_count}</div>
-            <div class='card-desc'>Flagged by Isolation Forest on {hotspots.get('data_date')}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Avg AQI
+        latest_aqi = ds['aqi'].values[-1]
+        avg_aqi = float(np.mean(latest_aqi))
         
-    # Model Correlation
-    corr = metrics.get('correlation', 0.95) if metrics else 0.97
-    with col3:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-title'>Forecast Correlation (R)</div>
-            <div class='card-value'>{corr:.3f}</div>
-            <div class='card-desc'>CNN-LSTM validation prediction coefficient</div>
-        </div>
-        """, unsafe_allow_html=True)
+        with col1:
+            st.markdown(f"""
+            <div class='card' title='An estimated Air Quality Index derived from satellite pollutant readings (not a ground-station measurement).'>
+                <div class='card-title'>Average Predicted AQI {icon('info', 16, '#45a29e')}</div>
+                <div class='card-value'>{avg_aqi:.1f}</div>
+                <div class='card-desc'>Forecasted next-day average for study region</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Active Hotspots
+        h_count = hotspots.get('hotspots_count', 0)
+        with col2:
+            st.markdown(f"""
+            <div class='card'>
+                <div class='card-title'>Active HCHO Hotspots</div>
+                <div class='card-value'>{h_count}</div>
+                <div class='card-desc'>Flagged by Isolation Forest on {hotspots.get('data_date')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Model Correlation
+        corr = metrics.get('correlation', 0.95) if metrics else 0.97
+        with col3:
+            st.markdown(f"""
+            <div class='card'>
+                <div class='card-title'>Forecast Correlation (R)</div>
+                <div class='card-value'>{corr:.3f}</div>
+                <div class='card-desc'>CNN-LSTM validation prediction coefficient</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Refresh Timestamp
+        refresh = hotspots.get('run_timestamp', datetime.now().strftime('%Y-%m-%d %H:%M'))
+        with col4:
+            st.markdown(f"""
+            <div class='card'>
+                <div class='card-title'>Last Data Refresh</div>
+                <div class='card-value' style='font-size:1.8rem; padding-top:0.3rem;'>{refresh.split(' ')[0]}</div>
+                <div class='card-desc'>Pipeline run: {refresh.split(' ')[1]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # 2. Main Page Content (Map + Grid description)
+        left_col, right_col = st.columns([3, 2])
         
-    # Refresh Timestamp
-    refresh = hotspots.get('run_timestamp', datetime.now().strftime('%Y-%m-%d %H:%M'))
-    with col4:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-title'>Last Data Refresh</div>
-            <div class='card-value' style='font-size:1.8rem; padding-top:0.3rem;'>{refresh.split(' ')[0]}</div>
-            <div class='card-desc'>Pipeline run: {refresh.split(' ')[1]}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # 2. Main Page Content (Map + Grid description)
-    left_col, right_col = st.columns([3, 2])
-    
-    with left_col:
-        st.markdown("<h3 style='color:#ffffff;'>Study Area Boundary & Grid Resolution</h3>", unsafe_allow_html=True)
-        
-        # Plot Bounding Box on Map
-        center_lat = (bbox['min_lat'] + bbox['max_lat']) / 2.0
-        center_lon = (bbox['min_lon'] + bbox['max_lon']) / 2.0
-        
-        # Bounding box polygon
-        bbox_coords = [
-            [bbox['min_lon'], bbox['min_lat']],
-            [bbox['max_lon'], bbox['min_lat']],
-            [bbox['max_lon'], bbox['max_lat']],
-            [bbox['min_lon'], bbox['max_lat']],
-            [bbox['min_lon'], bbox['min_lat']]
-        ]
-        
-        # Create pydeck map
-        view_state = pdk.ViewState(
-            latitude=center_lat,
-            longitude=center_lon,
-            zoom=6.5 if (bbox['max_lat'] - bbox['min_lat']) > 1.5 else 7.5,
-            pitch=30
-        )
-        
-        layer = pdk.Layer(
-            "PolygonLayer",
-            [{"polygon": bbox_coords}],
-            get_polygon="polygon",
-            get_fill_color="[102, 252, 241, 30]",
-            get_line_color="[102, 252, 241, 200]",
-            line_width_min_pixels=3,
-            filled=True,
-            extruded=False,
-        )
-        
-        # Add a marker for the Center of the selected region
-        center_marker = pdk.Layer(
-            "ScatterplotLayer",
-            pd.DataFrame({'lat': [center_lat], 'lon': [center_lon]}),
-            get_position="[lon, lat]",
-            get_color="[230, 57, 70, 240]",
-            get_radius=10000,
-            pickable=True
-        )
-        
-        st.pydeck_chart(pdk.Deck(
-            layers=[layer, center_marker],
-            initial_view_state=view_state,
-            map_provider="carto",
-            map_style="dark",
-            tooltip={"text": f"{selected_region} Boundary Grid"}
-        ))
-        
-    with right_col:
-        st.markdown("<h3 style='color:#ffffff;'>Data & Model Pipeline Workflow</h3>", unsafe_allow_html=True)
-        st.markdown(f"""
-        The pipeline operates continuously on a day-to-day cycle:
-        
-        1. **Ingestion Layer:** Sentinel-5P TROPOMI satellite data (HCHO, NO2, UV Aerosol Index) and ECMWF ERA5 Land meteorological hourly variables (temperature, wind vectors, dewpoint, precipitation) are fetched dynamically via the Earth Engine API, clipped to the **{selected_region}** bounds, and averaged.
-        2. **Feature Preprocessing:** Features are aligned on a uniform 0.05° grid. Missing data is interpolated. A target **Proxy AQI** is calculated from pollutant sub-indices based on ambient guidelines. Features are normalized utilizing scaling parameters.
-        3. **CNN-LSTM Forecast:** A convolutional neural network extracts local spatial and temporal patterns from a 7-day lookback window, passed into an LSTM cell to predict the next-day gridded AQI.
-        4. **Isolation Forest Anomalies:** Isolation Forest runs over the multi-pollutant feature vectors for each grid cell, identifying spatial anomalies that represent high-concentration chemical hotspots.
-        """)
-        
-        # Mini Data Table view
-        st.markdown("<h4 style='color:#45a29e;'>Grid Variables Information</h4>", unsafe_allow_html=True)
-        vars_info = pd.DataFrame({
-            'Variable': ['HCHO', 'NO2', 'AOD', 'Temperature', 'Winds', 'Precipitation'],
-            'Source': ['Sentinel-5P', 'Sentinel-5P', 'Sentinel-5P', 'ERA5 Land', 'ERA5 Land', 'ERA5 Land'],
-            'Mean Value': [
-                f"{float(ds['hcho'].mean()):.2e} mol/m²",
-                f"{float(ds['no2'].mean()):.2e} mol/m²",
-                f"{float(ds['aod'].mean()):.2f}",
-                f"{float(ds['temp'].mean() - 273.15):.1f} °C",
-                "U: {:.2f} / V: {:.2f} m/s".format(float(ds['u_wind'].mean()), float(ds['v_wind'].mean())),
-                f"{float(ds['precip'].mean() * 1000):.2f} mm/day"
+        with left_col:
+            st.markdown("<h3 style='color:#ffffff;'>Study Area Boundary & Grid Resolution</h3>", unsafe_allow_html=True)
+            
+            # Plot Bounding Box on Map
+            center_lat = (bbox['min_lat'] + bbox['max_lat']) / 2.0
+            center_lon = (bbox['min_lon'] + bbox['max_lon']) / 2.0
+            
+            # Bounding box polygon
+            bbox_coords = [
+                [bbox['min_lon'], bbox['min_lat']],
+                [bbox['max_lon'], bbox['min_lat']],
+                [bbox['max_lon'], bbox['max_lat']],
+                [bbox['min_lon'], bbox['max_lat']],
+                [bbox['min_lon'], bbox['min_lat']]
             ]
-        })
-        st.dataframe(vars_info, use_container_width=True)
+            
+            # Create pydeck map
+            view_state = pdk.ViewState(
+                latitude=center_lat,
+                longitude=center_lon,
+                zoom=6.5 if (bbox['max_lat'] - bbox['min_lat']) > 1.5 else 7.5,
+                pitch=30
+            )
+            
+            layer = pdk.Layer(
+                "PolygonLayer",
+                [{"polygon": bbox_coords}],
+                get_polygon="polygon",
+                get_fill_color="[102, 252, 241, 30]",
+                get_line_color="[102, 252, 241, 200]",
+                line_width_min_pixels=3,
+                filled=True,
+                extruded=False,
+            )
+            
+            # Add a marker for the Center of the selected region
+            center_marker = pdk.Layer(
+                "ScatterplotLayer",
+                pd.DataFrame({'lat': [center_lat], 'lon': [center_lon]}),
+                get_position="[lon, lat]",
+                get_color="[230, 57, 70, 240]",
+                get_radius=10000,
+                pickable=True
+            )
+            
+            st.pydeck_chart(pdk.Deck(
+                layers=[layer, center_marker],
+                initial_view_state=view_state,
+                map_provider="carto",
+                map_style="dark",
+                tooltip={"text": f"{selected_region} Boundary Grid"}
+            ))
+            
+        with right_col:
+            st.markdown("<h3 style='color:#ffffff;'>Data & Model Pipeline Workflow</h3>", unsafe_allow_html=True)
+            st.markdown(f"""
+            The pipeline operates continuously on a day-to-day cycle:
+            
+            1. **Ingestion Layer:** Sentinel-5P TROPOMI satellite data (HCHO, NO2, UV Aerosol Index) and ECMWF ERA5 Land meteorological hourly variables (temperature, wind vectors, dewpoint, precipitation) are fetched dynamically via the Earth Engine API, clipped to the **{selected_region}** bounds, and averaged.
+            2. **Feature Preprocessing:** Features are aligned on a uniform 0.05° grid. Missing data is interpolated. A target **Proxy AQI** is calculated from pollutant sub-indices based on ambient guidelines. Features are normalized utilizing scaling parameters.
+            3. **CNN-LSTM Forecast:** A convolutional neural network extracts local spatial and temporal patterns from a 7-day lookback window, passed into an LSTM cell to predict the next-day gridded AQI.
+            4. **Isolation Forest Anomalies:** Isolation Forest runs over the multi-pollutant feature vectors for each grid cell, identifying spatial anomalies that represent high-concentration chemical hotspots.
+            """)
+            
+            # Mini Data Table view
+            st.markdown("<h4 style='color:#45a29e;'>Grid Variables Information</h4>", unsafe_allow_html=True)
+            vars_info = pd.DataFrame({
+                'Variable': ['HCHO', 'NO2', 'AOD', 'Temperature', 'Winds', 'Precipitation'],
+                'Source': ['Sentinel-5P', 'Sentinel-5P', 'Sentinel-5P', 'ERA5 Land', 'ERA5 Land', 'ERA5 Land'],
+                'Mean Value': [
+                    f"{float(ds['hcho'].mean()):.2e} mol/m²",
+                    f"{float(ds['no2'].mean()):.2e} mol/m²",
+                    f"{float(ds['aod'].mean()):.2f}",
+                    f"{float(ds['temp'].mean() - 273.15):.1f} °C",
+                    "U: {:.2f} / V: {:.2f} m/s".format(float(ds['u_wind'].mean()), float(ds['v_wind'].mean())),
+                    f"{float(ds['precip'].mean() * 1000):.2f} mm/day"
+                ]
+            })
+            st.dataframe(vars_info, use_container_width=True)
+    else:
+        st.info("Pipeline datasets are missing or not compiled. Run data_ingest.py, preprocess.py, and model.py to populate.")
 
-else:
-    st.info("Pipeline datasets are missing or not compiled. Run data_ingest.py, preprocess.py, and model.py to populate.")
+# --- DISPATCH ROUTING ---
+if selected_page == "Overview":
+    show_overview(selected_region, region_slug, bbox, paths, ds, hotspots, metrics)
+elif selected_page == "AQI Forecast Map":
+    from dashboard.views import aqi_forecast_map
+    importlib.reload(aqi_forecast_map)
+    aqi_forecast_map.show(selected_region, region_slug, bbox, paths)
+elif selected_page == "HCHO Hotspots":
+    from dashboard.views import hcho_hotspots
+    importlib.reload(hcho_hotspots)
+    hcho_hotspots.show(selected_region, region_slug, bbox, paths)
+elif selected_page == "Methodology":
+    from dashboard.views import methodology
+    importlib.reload(methodology)
+    methodology.show(selected_region, region_slug, bbox, paths)
+

@@ -21,22 +21,25 @@ def calculate_proxy_aqi(ds):
     
     return proxy_aqi
 
-def build_sequences(data, target, lookback):
+def build_sequences(data, target, is_ground, lookback):
     """Creates sliding window sequences from gridded data."""
     n_time, n_lat, n_lon, n_feats = data.shape
     X_list = []
     y_list = []
+    is_ground_list = []
     
     for i in range(n_lat):
         for j in range(n_lon):
             cell_data = data[:, i, j, :]
             cell_target = target[:, i, j]
+            cell_is_ground = is_ground[:, i, j]
             
             for t in range(lookback, n_time):
                 X_list.append(cell_data[t-lookback:t])
                 y_list.append(cell_target[t])
+                is_ground_list.append(cell_is_ground[t])
                 
-    return np.array(X_list), np.array(y_list)
+    return np.array(X_list), np.array(y_list), np.array(is_ground_list)
 
 def main():
     parser = argparse.ArgumentParser(description="Preprocess grid data")
@@ -66,19 +69,84 @@ def main():
     
     # 1. Compute Proxy AQI
     print("Calculating proxy AQI target...")
-    aqi = calculate_proxy_aqi(ds)
-    ds['aqi'] = (['time', 'lat', 'lon'], aqi)
+    proxy_aqi = calculate_proxy_aqi(ds)
+    ds['proxy_aqi'] = (['time', 'lat', 'lon'], proxy_aqi)
+    # Maintain backwards compatibility for other code referencing 'aqi'
+    ds['aqi'] = (['time', 'lat', 'lon'], proxy_aqi)
     
-    # Define features
-    feature_names = ['hcho', 'no2', 'aod', 'temp', 'u_wind', 'v_wind', 'dewpoint', 'precip']
+    # 2. Integrate CPCB ground stations if cache exists
+    cpcb_cache_path = os.path.join(config.CACHE_DIR, f"cpcb_{region_slug}.csv")
+    ground_aqi = np.full(ds['aqi'].shape, np.nan)
+    is_ground_grid = np.zeros(ds['aqi'].shape, dtype=bool)
     
-    # 2. Extract features as numpy stack
+    if os.path.exists(cpcb_cache_path):
+        print(f"Loading CPCB station data from {cpcb_cache_path}...")
+        df_cpcb = pd.read_csv(cpcb_cache_path)
+        
+        # Spatial matching: find stations within 10 km (~0.09 degrees)
+        stations = df_cpcb[['station_name', 'latitude', 'longitude']].drop_duplicates().to_dict(orient='records')
+        station_matches = []
+        lats = ds.lat.values
+        lons = ds.lon.values
+        
+        for s in stations:
+            lat_idx = np.argmin(np.abs(lats - s['latitude']))
+            lon_idx = np.argmin(np.abs(lons - s['longitude']))
+            # Approx distance in km: 1 degree latitude = 111 km
+            # Simple Euclidean distance in degrees scaled to km is fine for 10km threshold
+            dist = np.sqrt((lats[lat_idx] - s['latitude'])**2 + (lons[lon_idx] - s['longitude'])**2) * 111.0
+            
+            if dist <= 10.0:
+                station_matches.append({
+                    'name': s['station_name'],
+                    'lat_idx': lat_idx,
+                    'lon_idx': lon_idx
+                })
+                print(f"CPCB Station Mapping: '{s['station_name']}' mapped to grid cell idx ({lat_idx}, {lon_idx}) at distance {dist:.2f} km")
+            else:
+                print(f"CPCB Station Mapping: '{s['station_name']}' is outside 10 km radius (distance {dist:.2f} km). Skipping.")
+                
+        # Populate ground_aqi array
+        for match in station_matches:
+            name = match['name']
+            lat_idx = match['lat_idx']
+            lon_idx = match['lon_idx']
+            
+            df_station = df_cpcb[df_cpcb['station_name'] == name].copy()
+            df_station['date'] = pd.to_datetime(df_station['date'])
+            df_station = df_station.set_index('date')
+            
+            for t, time_val in enumerate(pd.to_datetime(ds.time.values)):
+                if time_val in df_station.index:
+                    val = df_station.loc[time_val, 'ground_aqi']
+                    if not np.isnan(val):
+                        if np.isnan(ground_aqi[t, lat_idx, lon_idx]):
+                            ground_aqi[t, lat_idx, lon_idx] = val
+                        else:
+                            # Average readings if multiple stations map to same grid cell
+                            ground_aqi[t, lat_idx, lon_idx] = 0.5 * (ground_aqi[t, lat_idx, lon_idx] + val)
+                        is_ground_grid[t, lat_idx, lon_idx] = True
+                        
+        print(f"Mapped CPCB stations to {is_ground_grid.sum()} grid-day combinations.")
+    else:
+        print(f"Warning: CPCB ground truth cache not found at {cpcb_cache_path}. Proceeding with proxy-only ground data.")
+        
+    ds['ground_aqi'] = (['time', 'lat', 'lon'], ground_aqi)
+    ds['is_ground'] = (['time', 'lat', 'lon'], is_ground_grid)
+    
+    # 3. Construct Consolidated Training Target
+    target_aqi = np.where(is_ground_grid, ground_aqi, proxy_aqi)
+    
+    # Define features (with proxy_aqi included as a feature)
+    feature_names = ['hcho', 'no2', 'aod', 'temp', 'u_wind', 'v_wind', 'dewpoint', 'precip', 'proxy_aqi']
+    
+    # Extract features as numpy stack
     feat_arrays = []
     for f in feature_names:
         feat_arrays.append(ds[f].values)
-    features_stack = np.stack(feat_arrays, axis=-1)  # (time, lat, lon, 8)
+    features_stack = np.stack(feat_arrays, axis=-1)  # (time, lat, lon, 9)
     
-    # 3. Normalize features
+    # Normalize features
     flat_features = features_stack.reshape(-1, len(feature_names))
     
     # Paths for scaling
@@ -107,8 +175,15 @@ def main():
         if os.path.exists(scaler_path_delhi):
             print(f"Applying pre-trained Delhi-NCR scaling factors to region '{region_name}'...")
             scalers = joblib.load(scaler_path_delhi)
-            means = np.array(scalers['means'])
-            stds = np.array(scalers['stds'])
+            # Ensure loaded scaler matches our feature length (incase of legacy runs)
+            if len(scalers['means']) == len(feature_names):
+                means = np.array(scalers['means'])
+                stds = np.array(scalers['stds'])
+            else:
+                print("Warning: Pre-trained scaler features length mismatch. Fitting local parameters...")
+                means = np.nanmean(flat_features, axis=0)
+                stds = np.nanstd(flat_features, axis=0)
+                stds[stds == 0.0] = 1.0
         else:
             print(f"Warning: Delhi-NCR scaler not found at {scaler_path_delhi}. Fitting local parameters on the fly...")
             means = np.nanmean(flat_features, axis=0)
@@ -121,18 +196,30 @@ def main():
     
     # 4. Build training/inference sequences
     print(f"Building sequences with lookback of {config.LOOKBACK_DAYS} days...")
-    X, y = build_sequences(norm_features_stack, aqi, config.LOOKBACK_DAYS)
-    print(f"Sequences shape: X={X.shape}, y={y.shape}")
+    X, y, is_ground_seq = build_sequences(norm_features_stack, target_aqi, is_ground_grid, config.LOOKBACK_DAYS)
+    print(f"Sequences shape: X={X.shape}, y={y.shape}, is_ground={is_ground_seq.shape}")
     
     # Save processed tensors
     np.save(paths['X'], X)
     np.save(paths['y'], y)
-    print(f"Saved processed sequence arrays to {paths['X']} and {paths['y']}")
+    np.save(paths['is_ground'], is_ground_seq)
+    print(f"Saved processed sequence arrays to {paths['X']}, {paths['y']} and {paths['is_ground']}")
     
+    # For Delhi-NCR (default models/training), save to direct files
+    if region_slug == "delhi_ncr":
+        X_path_direct = os.path.join(config.PROCESSED_DIR, "X.npy")
+        y_path_direct = os.path.join(config.PROCESSED_DIR, "y.npy")
+        is_ground_path_direct = os.path.join(config.PROCESSED_DIR, "is_ground.npy")
+        np.save(X_path_direct, X)
+        np.save(y_path_direct, y)
+        np.save(is_ground_path_direct, is_ground_seq)
+        print(f"Saved default Delhi-NCR sequence arrays for training.")
+        
     # Save processed xarray grid dataset
     ds.to_netcdf(paths['processed_grid'])
     print(f"Saved processed dataset grid to {paths['processed_grid']}")
     print(f"Preprocessing completed successfully for region '{region_name}'.")
+
 
 if __name__ == "__main__":
     main()

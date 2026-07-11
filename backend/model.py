@@ -39,6 +39,7 @@ def build_model(input_shape):
 def main():
     X_path = os.path.join(config.PROCESSED_DIR, "X.npy")
     y_path = os.path.join(config.PROCESSED_DIR, "y.npy")
+    is_ground_path = os.path.join(config.PROCESSED_DIR, "is_ground.npy")
     
     if not (os.path.exists(X_path) and os.path.exists(y_path)):
         print(f"Error: Processed data not found at {config.PROCESSED_DIR}. Run preprocess.py first.")
@@ -48,11 +49,17 @@ def main():
     X = np.load(X_path)
     y = np.load(y_path)
     
-    print(f"Data shapes: X={X.shape}, y={y.shape}")
+    if os.path.exists(is_ground_path):
+        is_ground = np.load(is_ground_path)
+    else:
+        print("Warning: is_ground.npy not found, assuming all false.")
+        is_ground = np.zeros_like(y, dtype=bool)
+        
+    print(f"Data shapes: X={X.shape}, y={y.shape}, is_ground={is_ground.shape}")
     
     # Split into Train and Validation
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=config.VAL_SPLIT, random_state=42
+    X_train, X_val, y_train, y_val, is_ground_train, is_ground_val = train_test_split(
+        X, y, is_ground, test_size=config.VAL_SPLIT, random_state=42
     )
     
     print(f"Training on {X_train.shape[0]} samples, validating on {X_val.shape[0]} samples.")
@@ -85,14 +92,27 @@ def main():
     
     # Evaluate
     print("Evaluating model...")
-    val_loss, val_mae, val_rmse = model.evaluate(X_val, y_val, verbose=0)
-    print(f"Validation Metrics -> Loss: {val_loss:.4f}, MAE: {val_mae:.4f}, RMSE: {val_rmse:.4f}")
+    # First, evaluate on the full validation set (mainly proxy targets)
+    all_val_loss, all_val_mae, all_val_rmse = model.evaluate(X_val, y_val, verbose=0)
+    all_predictions = model.predict(X_val, batch_size=1024, verbose=0).flatten()
+    all_correlation = float(np.corrcoef(all_predictions, y_val)[0, 1])
+    print(f"All Validation (Proxy-dominated) Metrics -> MAE: {all_val_mae:.4f}, RMSE: {all_val_rmse:.4f}, R: {all_correlation:.4f}")
     
-    # Generate predictions to compute correlation and metrics
-    predictions = model.predict(X_val, batch_size=1024, verbose=0).flatten()
-    correlation = float(np.corrcoef(predictions, y_val)[0, 1])
-    print(f"Predicted vs Actual Correlation: {correlation:.4f}")
-    
+    # Now, evaluate specifically on ground-truth CPCB monitor samples
+    has_ground = (is_ground_val == True)
+    if np.any(has_ground):
+        print(f"Found {np.sum(has_ground)} ground-truth CPCB validation samples. Computing final metrics against them...")
+        X_val_ground = X_val[has_ground]
+        y_val_ground = y_val[has_ground]
+        val_loss, val_mae, val_rmse = model.evaluate(X_val_ground, y_val_ground, verbose=0)
+        predictions = model.predict(X_val_ground, batch_size=1024, verbose=0).flatten()
+        correlation = float(np.corrcoef(predictions, y_val_ground)[0, 1])
+        print(f"CPCB Ground Validation Metrics -> MAE: {val_mae:.4f}, RMSE: {val_rmse:.4f}, R: {correlation:.4f}")
+    else:
+        print("Warning: No CPCB ground-truth validation samples found. Falling back to proxy metrics.")
+        val_loss, val_mae, val_rmse = all_val_loss, all_val_mae, all_val_rmse
+        correlation = all_correlation
+        
     # Save Model
     model.save(model_path)
     print(f"Saved model file to {model_path}")
@@ -103,6 +123,10 @@ def main():
         'val_mae': float(val_mae),
         'val_rmse': float(val_rmse),
         'correlation': correlation,
+        'proxy_val_loss': float(all_val_loss),
+        'proxy_val_mae': float(all_val_mae),
+        'proxy_val_rmse': float(all_val_rmse),
+        'proxy_correlation': all_correlation,
         'history': {
             'loss': [float(x) for x in history.history['loss']],
             'val_loss': [float(x) for x in history.history['val_loss']],

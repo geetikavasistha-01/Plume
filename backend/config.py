@@ -27,7 +27,17 @@ END_DATE_STR = END_DATE.strftime('%Y-%m-%d')
 GEE_PROJECT_ID = "project-3cb1a433-8a2a-42c4-9bc"
 
 # Gridding resolution (degrees)
-RESOLUTION = 0.05  # ~5 km resolution
+RESOLUTION = 0.05  # ~5 km resolution (default for cities)
+STATE_RESOLUTION = 0.1  # ~10 km resolution (for states)
+RESOLUTION_THRESHOLD = 2.0  # size span threshold (degrees) to classify as state
+
+def get_resolution(bbox):
+    """Returns dynamic resolution based on bounding box size (span)."""
+    lat_diff = bbox['max_lat'] - bbox['min_lat']
+    lon_diff = bbox['max_lon'] - bbox['min_lon']
+    if lat_diff > RESOLUTION_THRESHOLD or lon_diff > RESOLUTION_THRESHOLD:
+        return STATE_RESOLUTION
+    return RESOLUTION
 
 # ML Model training parameters
 LOOKBACK_DAYS = 7
@@ -56,5 +66,10 @@ def get_paths(region_slug):
         'processed_grid': os.path.join(PROCESSED_DIR, f"processed_grid_{region_slug}.nc"),
         'X': os.path.join(PROCESSED_DIR, f"X_{region_slug}.npy"),
         'y': os.path.join(PROCESSED_DIR, f"y_{region_slug}.npy"),
-        'hotspots': os.path.join(PROCESSED_DIR, f"hotspots_{region_slug}.json")
+        'is_ground': os.path.join(PROCESSED_DIR, f"is_ground_{region_slug}.npy"),
+        'hotspots': os.path.join(PROCESSED_DIR, f"hotspots_{region_slug}.json"),
+        'fire_cache': os.path.join(CACHE_DIR, f"fire_{region_slug}.csv"),
+        'fire_correlation': os.path.join(PROCESSED_DIR, f"fire_hcho_correlation_{region_slug}.json"),
+        'wind_rose': os.path.join(PROCESSED_DIR, f"wind_rose_{region_slug}.json"),
+        'predictions': os.path.join(PROCESSED_DIR, f"predictions_{region_slug}.npy")
     }

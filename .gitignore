@@ -24,3 +24,19 @@ isro_env/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Model weights
+models/*.keras
+models/*.h5
+
+# Secrets & credentials
+*.json
+!package.json
+.streamlit/secrets.toml
+*-key.json
+service-account*.json
+credentials.json
+
+# Logs
+*.log
+\!models/metrics.json
