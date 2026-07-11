@@ -1,4 +1,4 @@
-# <img src="dashboard/assets/logo.jpg" width="42" height="42" style="vertical-align: middle; border-radius: 8px; margin-right: 8px;" /> Plume — National Air Foresight
+# <img width="42" height="42" alt="Air icon" style="vertical-align: middle; border-radius: 8px; margin-right: 8px;" src="https://github.com/user-attachments/assets/aefbb97d-3025-46fe-8651-181347fa3ff6" /> Plume — National Air Foresight
 ### *From Orbit to Ground Truth*
 
 **Satellite-only next-day air quality forecasting and biomass-burning detection — anywhere in India, no ground sensor required.**
