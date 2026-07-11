@@ -43,7 +43,8 @@ Specifically, using Sentinel-5P TROPOMI (which measures NO₂, HCHO, and aerosol
 
 Type in *any* Indian city, district, or state — not a fixed shortlist — and the pipeline resolves its bounding box, pulls satellite + weather data, and forecasts next-day AQI on a 0.05° (~5km) grid.
 
-<p align="center"><em>[Insert screenshot: AQI Spatial Forecasting map for Punjab, showing the grid heatmap and forecast summary card]</em></p>
+<img width="1680" height="878" alt="Screenshot 2026-07-11 at 2 38 12 AM" src="https://github.com/user-attachments/assets/d4caa251-c69c-4479-8919-29c004318372" />
+AQI Spatial Forecasting map for Punjab, showing the grid heatmap and forecast summary card.
 
 For a full-state query like **Punjab (state, wide)**, the pipeline resolved a 4,624-cell grid and forecast an average AQI of **105.6 (Moderate)** for the target date, with per-cell tooltips showing the nearest town and its individual predicted value.
 
@@ -53,7 +54,8 @@ A standing banner is honest about a real constraint: the underlying CNN-LSTM was
 
 An Isolation Forest model scans every grid cell's multi-pollutant signature and flags the ones that look chemically abnormal — the satellite equivalent of "something is burning here."
 
-<p align="center"><em>[Insert screenshot: Formaldehyde Hotspot Detection page, showing 215/4624 flagged cells and the ranked hotspot table]</em></p>
+<img width="1147" height="756" alt="Screenshot 2026-07-11 at 10 40 40 AM" src="https://github.com/user-attachments/assets/858c7954-23b5-4169-9812-c17415fd3e9c" />
+Formaldehyde Hotspot Detection page, showing 215/4624 flagged cells and the ranked hotspot table
 
 On a recent run over Punjab, the model flagged **215 of 4,624 cells (≈4.6%)** as anomalous, with a mean HCHO concentration of 1.92×10⁻⁴ mol/m² (median 2.13×10⁻⁴, 95th percentile 4.52×10⁻⁴). The single most-affected location: **Pathankot, Punjab**, with an anomaly score of 91.7 — squarely in the "Severe" band.
 
@@ -63,7 +65,8 @@ Every flagged cell is reverse-geocoded to a real place name, so a scientist does
 
 This is where satellite fire detections and satellite chemistry get cross-examined against each other. NASA FIRMS active-fire points (MODIS/VIIRS) are overlaid directly on the HCHO hotspot map:
 
-<p align="center"><em>[Insert screenshot: Biomass Burning Source Localization map — orange fire points clustering inside magenta HCHO hotspot cells over Punjab's crop belt]</em></p>
+<img width="1341" height="682" alt="Screenshot 2026-07-11 at 2 39 11 AM" src="https://github.com/user-attachments/assets/418b28b0-16e0-4305-8b33-5ae9495f8eb9" />
+Biomass Burning Source Localization map — orange fire points clustering inside magenta HCHO hotspot cells over Punjab's crop belt
 
 The visual correlation is striking — dense clusters of active fires sit almost exactly inside the flagged HCHO cells around Ludhiana and Patiala. The pipeline statistically confirms burning *events*: periods are flagged whenever daily active-fire counts exceed a threshold of **mean + 2 standard deviations (86 fires/day)**. Two such events were identified in the sample window — **May 26** (92 fires, avg HCHO 2.24×10⁻⁴) and **May 29** (99 fires, avg HCHO 2.78×10⁻⁴) — with fire and HCHO time series tracking each other closely through the burning season before both collapsing after early June.
 
@@ -76,8 +79,9 @@ Fires don't pollute only where they burn — smoke travels. Using ERA5's U/V win
 ```
 Δx_deg = (u × 86400) / (111000 × cos(lat))      Δy_deg = (v × 86400) / 111000
 ```
+<img width="1370" height="889" alt="Screenshot 2026-07-11 at 2 39 22 AM" src="https://github.com/user-attachments/assets/bda17abc-874a-49cb-ac60-d77bce9c91da" />
 
-<p align="center"><em>[Insert screenshot: Wind Rose diagram showing dominant NW-to-E wind sectors colored by mean AQI, alongside the forward-trajectory table]</em></p>
+Wind Rose diagram showing dominant NW-to-E wind sectors colored by mean AQI, alongside the forward-trajectory table
 
 A **wind rose** aggregates daily wind direction into 8 compass sectors, colored by the mean AQI recorded under each wind regime — in the sampled period, winds from the **northwest** carried the highest associated AQI (~85-90), consistent with transport from upwind agricultural-burning zones. A companion table projects each hotspot's coordinates 24 hours downwind, giving a rough answer to "if this doesn't clear, where does it go next."
 
@@ -87,7 +91,8 @@ A **wind rose** aggregates daily wind direction into 8 compass sectors, colored 
 
 The forecasting model is a **CNN-1D + LSTM** hybrid: the convolutional layer picks up short-term gradient shifts (a spike starting), the LSTM carries a 7-day memory of slower buildup (a stagnant week), and a dense layer resolves both into a next-day AQI prediction per grid cell.
 
-<p align="center"><em>[Insert screenshot: Model Performance & Validation panel — predicted vs. actual scatter plot and training/validation loss curves]</em></p>
+<img width="1378" height="723" alt="Screenshot 2026-07-11 at 2 38 34 AM" src="https://github.com/user-attachments/assets/1033ce68-4407-4a13-9500-56fef68d3b89" />
+Model Performance & Validation panel — predicted vs. actual scatter plot and training/validation loss curves
 
 | Metric | Value | What it means |
 |---|---|---|
@@ -101,49 +106,8 @@ Training and validation loss both converge cleanly over 15 epochs with no visibl
 ---
 
 ## Architecture
+<img width="1536" height="1024" alt="img 6" src="https://github.com/user-attachments/assets/86dd6b87-9734-45b9-b69e-f6d9d2a456cd" />
 
-```
-                    ┌─────────────────────┐
-                    │   Any Indian city,   │
-                    │  district, or state  │
-                    └──────────┬──────────┘
-                               │  resolved to bounding box
-                               ▼
-        ┌───────────────────────────────────────────┐
-        │              INGESTION LAYER                │
-        │  Sentinel-5P TROPOMI (HCHO, NO2, UV AI)     │
-        │  ERA5-Land (temp, wind U/V, dewpoint, precip)│
-        │  NASA FIRMS (MODIS/VIIRS active fires)      │
-        │  CPCB CAAQM (ground station readings)       │
-        └──────────────────┬───────────────────────────┘
-                            │  gridded @ 0.05°, 7-day lookback
-                            ▼
-        ┌───────────────────────────────────────────┐
-        │             PREPROCESSING                    │
-        │  Proxy AQI (satellite-derived, CPCB formula) │
-        │  Ground AQI (real CPCB stations, where avail)│
-        │  MinMax scaling · sequence building           │
-        └──────────────────┬───────────────────────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              ▼                           ▼
-   ┌───────────────────┐        ┌───────────────────────┐
-   │   CNN-1D + LSTM     │        │    Isolation Forest     │
-   │  next-day AQI grid  │        │  HCHO/NO2/AOD anomalies │
-   └──────────┬──────────┘        └───────────┬─────────────┘
-              │                               │
-              ▼                               ▼
-   ┌────────────────────┐        ┌───────────────────────────┐
-   │  Fire × HCHO        │        │   Wind Advection            │
-   │  correlation engine │        │   24h trajectory projection │
-   └──────────┬──────────┘        └───────────┬─────────────────┘
-              └───────────────┬───────────────┘
-                               ▼
-                   ┌───────────────────────┐
-                   │   Streamlit Dashboard  │
-                   │  Overview · Forecast   │
-                   │  Hotspots · Methodology│
-                   └───────────────────────┘
 ```
 
 <p align="center"><em>[Insert screenshot: Dashboard overview page — top navbar with logo + Overview/AQI Forecast Map/HCHO Hotspots/Methodology tabs, sidebar with region config, live GEE mode banner]</em></p>
