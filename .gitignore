@@ -40,3 +40,7 @@ credentials.json
 # Logs
 *.log
 \!models/metrics.json
+
+# Database
+database/
+

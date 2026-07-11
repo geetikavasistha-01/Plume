@@ -1,0 +1,27 @@
+# Exclude git repository metadata
+.git/
+.gitignore
+.gitattributes
+
+# Exclude virtual environments
+venv/
+env/
+isro_env/
+.env
+
+# Exclude local cached and processed datasets
+data/cache/
+data/processed/
+data/**/*.nc
+data/**/*.npy
+data/**/*.joblib
+database/
+
+# Exclude secrets and credential files
+.streamlit/secrets.toml
+*-key.json
+service-account*.json
+credentials.json
+
+# Exclude logs and output
+*.log
