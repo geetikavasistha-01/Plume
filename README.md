@@ -109,8 +109,8 @@ Training and validation loss both converge cleanly over 15 epochs with no visibl
 <img width="1536" height="1024" alt="img 6" src="https://github.com/user-attachments/assets/86dd6b87-9734-45b9-b69e-f6d9d2a456cd" />
 
 ```
-
-<p align="center"><em>[Insert screenshot: Dashboard overview page — top navbar with logo + Overview/AQI Forecast Map/HCHO Hotspots/Methodology tabs, sidebar with region config, live GEE mode banner]</em></p>
+```
+<img width="1680" height="925" alt="Screenshot 2026-07-11 at 2 37 54 AM" src="https://github.com/user-attachments/assets/73e5fa60-4dfd-410d-ad1d-444d127afe34" />
 
 ---
 
