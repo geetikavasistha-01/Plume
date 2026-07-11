@@ -4,8 +4,9 @@ import pandas as pd
 import sqlite3
 
 def main():
-    nc_path = "/Users/geetikavasistha/isro_aqi_hcho/data/processed/processed_grid_delhi_ncr.nc"
-    db_dir = "/Users/geetikavasistha/isro_aqi_hcho/database"
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    nc_path = os.path.join(base_dir, "data", "processed", "processed_grid_delhi_ncr.nc")
+    db_dir = os.path.join(base_dir, "database")
     db_path = os.path.join(db_dir, "plume_training_data.db")
     csv_path = os.path.join(db_dir, "plume_training_data.csv")
 

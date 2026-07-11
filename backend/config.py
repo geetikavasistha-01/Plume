@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta
 
 # Project directories
-BASE_DIR = "/Users/geetikavasistha/isro_aqi_hcho"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CACHE_DIR = os.path.join(DATA_DIR, "cache")
 PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
