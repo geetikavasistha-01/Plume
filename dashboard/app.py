@@ -18,7 +18,7 @@ from dashboard.icon_utils import inject_material_icons, icon
 
 # Set page config
 st.set_page_config(
-    page_title="ISRO AQI & HCHO Pipeline",
+    page_title="Plume — AQI & HCHO Forecast Dashboard",
     page_icon="dashboard/assets/logo.jpg",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -184,8 +184,8 @@ with logo_col:
     logo_html = f"""
     <div style="display: flex; align-items: center; gap: 12px; padding-top: 0.2rem; margin-bottom: 1rem;">
         <img src="{logo_src}" style="height: 34px; width: 34px; border-radius: 6px; object-fit: cover;" />
-        <span style="font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">
-            ISRO AQI & HCHO
+        <span style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">
+            Plume
         </span>
     </div>
     """
