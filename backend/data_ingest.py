@@ -113,7 +113,21 @@ def pull_gee_data(bbox, region_name):
     import geemap
     
     print(f"Initializing Earth Engine for region '{region_name}' with Project ID: {config.GEE_PROJECT_ID}...")
-    ee.Initialize(project=config.GEE_PROJECT_ID)
+    try:
+        import streamlit as st
+        # If running inside Streamlit Cloud and the gcp secrets block is defined
+        if "gcp" in st.secrets:
+            print("Authenticating with service account credentials from st.secrets['gcp']...")
+            from google.oauth2 import service_account
+            gcp_info = st.secrets["gcp"]
+            credentials = service_account.Credentials.from_service_account_info(dict(gcp_info))
+            ee.Initialize(credentials, project=config.GEE_PROJECT_ID)
+        else:
+            # Fallback to local machine GEE config
+            ee.Initialize(project=config.GEE_PROJECT_ID)
+    except Exception as e:
+        print(f"Streamlit secrets auth failed or not available ({e}). Attempting default credentials...")
+        ee.Initialize(project=config.GEE_PROJECT_ID)
     
     aoi = ee.Geometry.Rectangle([
         bbox['min_lon'],
