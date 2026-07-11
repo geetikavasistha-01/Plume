@@ -3,9 +3,9 @@
 
 **Satellite-only next-day air quality forecasting and biomass-burning detection — anywhere in India, no ground sensor required.**
 
-[![Model R²](https://img.shields.io/badge/Model_R²-0.890-brightgreen)]()
-[![Correlation](https://img.shields.io/badge/Correlation-0.938-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/Coverage-All_India-blue)]()
+<img width="1377" height="911" alt="Screenshot 2026-07-11 at 2 38 28 AM" src="https://github.com/user-attachments/assets/d73e8ff1-ef19-4d36-8a86-20af3622fd5f" />
+<img width="1341" height="682" alt="Screenshot 2026-07-11 at 2 39 11 AM" src="https://github.com/user-attachments/assets/befc2738-c870-4aa4-998e-45b627154399" />
+
 
 Ground AQI monitors cover a few hundred points in India. Plume uses Sentinel-5P TROPOMI and ERA5 reanalysis data to forecast tomorrow's AQI on a 5km grid **anywhere in the country**, flags formaldehyde hotspots that signal crop/forest burning using Isolation Forest anomaly detection, cross-references them against NASA FIRMS active-fire data, and projects 24-hour downwind smoke transport — all from space, cross-calibrated against real CPCB ground stations where available.
 
@@ -37,7 +37,7 @@ Specifically, using Sentinel-5P TROPOMI (which measures NO₂, HCHO, and aerosol
 
 ---
 
-## What We Built
+## What I Built
 
 ### 🗺️ 1. Nationwide AQI Forecasting
 
