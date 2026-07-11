@@ -282,13 +282,13 @@ def show(selected_region, region_slug, bbox, paths):
                     # Add Severity Category
                     def get_severity_category(score):
                         if score <= 40:
-                            return f"{status_dot('#00e400', 10)} Low"
+                            return "🟢 Low"
                         elif score <= 70:
-                            return f"{status_dot('#ffff00', 10)} Moderate"
+                            return "🟡 Moderate"
                         elif score <= 90:
-                            return f"{status_dot('#ff7e00', 10)} High"
+                            return "🟠 High"
                         else:
-                            return f"{status_dot('#ff0000', 10)} Severe"
+                            return "🔴 Severe"
                             
                     rank_df['Severity'] = rank_df['hotspot_score'].map(get_severity_category)
                     rank_df['Nearest Area'] = rank_df['location'].fillna("N/A")
