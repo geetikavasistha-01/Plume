@@ -1,4 +1,5 @@
- National Air Foresight 
+# Plume — National Air Foresight
+### *From Orbit to Ground Truth*
 
 **Satellite-only next-day air quality forecasting and biomass-burning detection — anywhere in India, no ground sensor required.**
 
@@ -6,7 +7,7 @@
 [![Correlation](https://img.shields.io/badge/Correlation-0.938-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/Coverage-All_India-blue)]()
 
-Ground AQI monitors cover a few hundred points in India. This pipeline uses Sentinel-5P TROPOMI and ERA5 reanalysis data to forecast tomorrow's AQI on a 5km grid **anywhere in the country**, flags formaldehyde hotspots that signal crop/forest burning using Isolation Forest anomaly detection, cross-references them against NASA FIRMS active-fire data, and projects 24-hour downwind smoke transport — all from space, cross-calibrated against real CPCB ground stations where available.
+Ground AQI monitors cover a few hundred points in India. Plume uses Sentinel-5P TROPOMI and ERA5 reanalysis data to forecast tomorrow's AQI on a 5km grid **anywhere in the country**, flags formaldehyde hotspots that signal crop/forest burning using Isolation Forest anomaly detection, cross-references them against NASA FIRMS active-fire data, and projects 24-hour downwind smoke transport — all from space, cross-calibrated against real CPCB ground stations where available.
 
 **⚡ Quick facts:**
 - 🎯 Forecast accuracy: **R² = 0.89**, MAE = 15.4 AQI units
@@ -17,11 +18,8 @@ Ground AQI monitors cover a few hundred points in India. This pipeline uses Sent
 👉 **[Full write-up below](#the-problem)** for the complete story, architecture, and honest limitations.
 
 ---
-# 🛰️ ISRO AQI & HCHO — Satellite-Driven Air Quality Intelligence for India
 
-**Predicting tomorrow's air, and finding out why today's air is bad — using nothing but satellites.**
-
-> Ground air-quality monitors cover a few hundred points in India. Satellites cover every square kilometer, every day. This project turns that satellite data into next-day AQI forecasts and pinpoints the chemical fingerprints of biomass burning — no ground sensor required to get started, though we calibrate against them wherever we can.
+> Ground air-quality monitors cover a few hundred points in India. Satellites cover every square kilometer, every day. Plume turns that satellite data into next-day AQI forecasts and pinpoints the chemical fingerprints of biomass burning — no ground sensor required to get started, though we calibrate against them wherever we can.
 
 ---
 
@@ -29,7 +27,7 @@ Ground AQI monitors cover a few hundred points in India. This pipeline uses Sent
 
 Every winter, a haze settles over North India. Everyone knows it's bad. Almost no one can tell you *why*, exactly, or *where* it's coming from, in a way precise enough to act on. Ground-based CPCB monitors are sparse and clustered around big cities — vast stretches of Punjab's crop belt, forest-fire zones, and smaller towns have no ground truth at all.
 
-This project asks: **can satellites fill that gap?**
+Plume asks: **can satellites fill that gap?**
 
 Specifically, using Sentinel-5P TROPOMI (which measures NO₂, HCHO, and aerosols from space) and ERA5 meteorological reanalysis, can we:
 
@@ -204,4 +202,4 @@ We'd rather list these than let someone discover them the hard way:
 
 ---
 
-*Built as part of an ISRO-aligned air quality research initiative — turning satellites into a national air quality sensor network, one grid cell at a time.*
+*Plume — turning satellites into a national air quality sensor network, one grid cell at a time.*
